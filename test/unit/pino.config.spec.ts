@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildPinoConfig } from '../../src/common/logger/pino.config';
 import { AppConfig } from '../../src/config/app.config';
 
@@ -38,6 +38,16 @@ function buildAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 }
 
 describe('buildPinoConfig', () => {
+  const originalVercelEnv = process.env.VERCEL;
+
+  afterEach(() => {
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = originalVercelEnv;
+    }
+  });
+
   it('redacts every sensitive field required by docs/security.md', () => {
     const pinoHttp = getPinoHttpOptions(buildAppConfig());
 
@@ -56,13 +66,21 @@ describe('buildPinoConfig', () => {
     );
   });
 
-  it('enables pino-pretty transport outside of production', () => {
+  it('enables pino-pretty transport outside of production, off Vercel', () => {
+    delete process.env.VERCEL;
     const pinoHttp = getPinoHttpOptions(buildAppConfig({ isProduction: false }));
     expect(pinoHttp.transport).toBeDefined();
   });
 
   it('disables pino-pretty transport in production (JSON logs)', () => {
+    delete process.env.VERCEL;
     const pinoHttp = getPinoHttpOptions(buildAppConfig({ isProduction: true }));
+    expect(pinoHttp.transport).toBeUndefined();
+  });
+
+  it('disables pino-pretty transport on Vercel even when NODE_ENV is not production', () => {
+    process.env.VERCEL = '1';
+    const pinoHttp = getPinoHttpOptions(buildAppConfig({ isProduction: false }));
     expect(pinoHttp.transport).toBeUndefined();
   });
 

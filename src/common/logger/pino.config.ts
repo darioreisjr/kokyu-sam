@@ -25,6 +25,20 @@ function extractRequestId(req: IncomingMessage): string {
   return value && value.length > 0 ? value : randomUUID();
 }
 
+/**
+ * pino-pretty is spawned via a worker thread (pino's `transport` option),
+ * which needs to resolve the module's file on disk to launch the thread.
+ * That file layout doesn't survive Vercel's serverless bundling/tracing,
+ * so enabling it there fails hard with "unable to determine transport
+ * target for pino-pretty" - crashing every request, not just logging
+ * ugly. Pretty-printing is a local-terminal convenience only; it must
+ * stay off on Vercel regardless of NODE_ENV (Preview still wants
+ * non-production behavior elsewhere, e.g. Swagger - see bootstrap.ts).
+ */
+function isRunningOnVercel(): boolean {
+  return process.env.VERCEL === '1';
+}
+
 export function buildPinoConfig(app: AppConfig): Params {
   return {
     pinoHttp: {
@@ -34,12 +48,13 @@ export function buildPinoConfig(app: AppConfig): Params {
         paths: REDACT_PATHS,
         censor: '[REDACTED]',
       },
-      transport: app.isProduction
-        ? undefined
-        : {
-            target: 'pino-pretty',
-            options: { singleLine: true, translateTime: 'HH:MM:ss' },
-          },
+      transport:
+        app.isProduction || isRunningOnVercel()
+          ? undefined
+          : {
+              target: 'pino-pretty',
+              options: { singleLine: true, translateTime: 'HH:MM:ss' },
+            },
       customProps: (req) => {
         const request = req as IncomingMessage & { user?: { id?: string } };
         return { userId: request.user?.id };
