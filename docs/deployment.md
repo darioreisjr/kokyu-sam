@@ -46,7 +46,7 @@ GitHub → Vercel → NestJS Functions (Node runtime) → Supabase
 ```
 
 - `api/index.ts` é o entrypoint da Vercel Function (Node.js runtime, não Edge), reaproveitando exatamente a mesma configuração de `src/main.ts` via `src/bootstrap.ts`.
-- `vercel.json` fixa `nodejs22.x`, reescreve todas as rotas para a Function, e usa `pnpm build`/`pnpm install --frozen-lockfile`.
+- `vercel.json` reescreve todas as rotas para a Function e usa `pnpm build`/`pnpm install --frozen-lockfile`. A versão do Node é lida do `engines.node` do `package.json` (`>=22 <25`) — não se define `runtime` em `vercel.json` para Node.js padrão; esse campo é só para runtimes de comunidade (formato `nome@versão`).
 - Escolher a região da Function o mais próxima possível da região do projeto Supabase, para reduzir latência (configurar em Project Settings → Functions → Region).
 - A aplicação é stateless: sem filesystem persistente (exceto `/tmp` efêmero, não usado nesta fase), sem sessão em memória, sem cron/fila/worker residente.
 
