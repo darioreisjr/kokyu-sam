@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+.git
+.github
+.vscode
+.idea
+test
+docs
+supabase
+*.md
+.env
+.env.local
+.env.*.local
+Dockerfile
+docker-compose.yml
+.dockerignore

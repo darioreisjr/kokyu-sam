@@ -1,0 +1,5 @@
+-- Local development seed data only. Never executed against staging/
+-- production (see docs/deployment.md). Intentionally empty for Phase 1:
+-- there is no business data yet, and auth users are best created through
+-- the real signUp flow (`pnpm db:start` + Inbucket) so the handle_new_user
+-- trigger and email confirmation flow get exercised too.

@@ -1,0 +1,24 @@
+# Optional convenience compose file for running the built API container
+# locally against Supabase local (`pnpm db:start`). Does NOT run its own
+# Postgres/Auth - the Supabase CLI already manages that stack via Docker.
+# See docs/deployment.md.
+services:
+  api:
+    build:
+      context: .
+      target: production
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      APP_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:3001
+      CORS_ORIGINS: http://localhost:3001
+      LOG_LEVEL: debug
+      # host.docker.internal lets the container reach Supabase local, which
+      # runs on the host via the Supabase CLI's own Docker Compose stack.
+      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
