@@ -68,7 +68,12 @@ export class HealthController {
       });
       clearTimeout(timeout);
 
-      return response.status < 500;
+      // Cast rather than rely on the ambient global `fetch`/`Response` types:
+      // they resolve inconsistently between this repo's own `tsc` run and
+      // Vercel's separate type-check of api/**/*.ts (no "dom" lib here by
+      // design - see tsconfig.json), which otherwise fails the build with
+      // "Property 'status' does not exist on type 'Response'".
+      return (response as unknown as { status: number }).status < 500;
     } catch {
       return false;
     }
