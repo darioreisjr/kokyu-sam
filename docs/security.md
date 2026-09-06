@@ -42,6 +42,8 @@ Nenhuma resposta de erro inclui stack trace, SQL, detalhes internos do Supabase,
 
 Allowlist explícita via `CORS_ORIGINS` (nunca `*` em produção). Apenas os métodos e headers necessários (`Authorization`, `Content-Type`, `X-Request-Id`). `credentials` desligado — a API usa Bearer token, não cookies cross-origin.
 
+`CORS_ORIGINS` aceita `*` como wildcard dentro de uma entrada (`src/common/utils/cors-origin.util.ts`), útil para os preview deployments dinâmicos da Vercel — ex.: `https://kokyu-*-projetosdarioreisjr.vercel.app`. O wildcard nunca cruza um `/` e cada padrão continua ancorado a um host específico que você controla; nunca usar algo como `https://*.vercel.app` (isso liberaria qualquer app de terceiros hospedado na Vercel).
+
 ## Rate limiting
 
 `@nestjs/throttler` global como complemento — **não** é a proteção primária, já que rate limit em memória de uma Function não é uma proteção distribuída quando há múltiplas instâncias na Vercel. A proteção real de auth (signup, login, recovery) é o rate limit nativo do Supabase Auth, que deve ser revisado antes de produção (`supabase/config.toml [auth.rate_limit]` localmente; painel do projeto em produção). Se necessário no futuro, considerar Vercel Firewall ou um store distribuído — não adicionar Redis nesta fase sem necessidade real.
