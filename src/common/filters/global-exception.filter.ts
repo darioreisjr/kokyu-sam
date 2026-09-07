@@ -18,6 +18,13 @@ const TITLES_BY_CODE: Record<ErrorCode, string> = {
   [ErrorCode.PROFILE_NOT_FOUND]: 'Profile not found',
   [ErrorCode.RATE_LIMITED]: 'Too many requests',
   [ErrorCode.INTERNAL_ERROR]: 'Internal server error',
+  [ErrorCode.PROFILE_SETUP_REQUIRED]: 'Profile setup required',
+  [ErrorCode.USERNAME_INVALID]: 'Invalid username',
+  [ErrorCode.BIRTH_DATE_INVALID]: 'Invalid birth date',
+  [ErrorCode.AGE_REQUIREMENT_NOT_MET]: 'Age requirement not met',
+  [ErrorCode.PROFILE_VALIDATION_ERROR]: 'Profile validation error',
+  [ErrorCode.AVATAR_INVALID]: 'Invalid avatar',
+  [ErrorCode.AVATAR_TOO_LARGE]: 'Avatar too large',
 };
 
 /**
@@ -38,7 +45,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<RequestWithId>();
     const requestId = this.extractRequestId(request);
 
-    const { status, code, detail } = this.resolve(exception);
+    const { status, code, detail, extra } = this.resolve(exception);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error({ err: exception, requestId }, 'Unhandled exception');
@@ -52,6 +59,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       detail,
       instance: request.url,
       requestId,
+      ...extra,
     };
 
     response.status(status).json(problem);
@@ -63,9 +71,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       : '';
   }
 
-  private resolve(exception: unknown): { status: HttpStatus; code: ErrorCode; detail: string } {
+  private resolve(exception: unknown): {
+    status: HttpStatus;
+    code: ErrorCode;
+    detail: string;
+    extra?: Record<string, unknown>;
+  } {
     if (exception instanceof AppError) {
-      return { status: exception.status, code: exception.code, detail: exception.message };
+      return {
+        status: exception.status,
+        code: exception.code,
+        detail: exception.message,
+        extra: exception.extra,
+      };
     }
 
     if (exception instanceof HttpException) {

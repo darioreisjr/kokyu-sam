@@ -17,16 +17,25 @@ export function mapClaimsToAuthenticatedUser(
     throw new Error('Cannot map claims without a subject (sub).');
   }
 
+  const provider = extractProvider(claims);
+
   return {
     id: claims.sub,
     email: claims.email,
     role: claims.role ?? 'authenticated',
     aal: claims.aal,
     sessionId: claims.session_id,
-    provider: extractProvider(claims),
+    provider,
+    providers: claims.app_metadata?.providers ?? [provider],
+    // Supabase only issues a session once the account's email has been
+    // confirmed (see docs/security.md - email confirmation is required in
+    // every environment), so a missing/absent claim still defaults to
+    // true rather than assuming unverified.
+    emailVerified: claims.email_verified ?? true,
     accessToken,
     issuedAt: claims.iat ? new Date(claims.iat * 1000) : undefined,
     expiresAt: claims.exp ? new Date(claims.exp * 1000) : undefined,
+    userMetadata: claims.user_metadata ?? {},
   };
 }
 

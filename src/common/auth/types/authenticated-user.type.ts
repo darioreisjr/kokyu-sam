@@ -20,8 +20,20 @@ export interface AuthenticatedUser {
   sessionId: string | undefined;
   /** Identity provider for this session, e.g. "email" or "google". */
   provider: string;
+  /** Every identity provider linked to this account, e.g. ["email", "google"]. */
+  providers: string[];
+  /** Whether the account's email has been confirmed. */
+  emailVerified: boolean;
   /** The access token itself, kept only for building a user-scoped client. */
   accessToken: string;
   issuedAt: Date | undefined;
   expiresAt: Date | undefined;
+  /**
+   * Raw `user_metadata` claim - profile-adjacent data the user/identity
+   * provider supplied at signup (e.g. first_name, given_name, picture).
+   * Internal use only (ProfileBootstrapService) - never log this wholesale
+   * and never return it directly from an endpoint; it is not
+   * authorization data.
+   */
+  userMetadata: Record<string, unknown>;
 }

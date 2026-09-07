@@ -61,4 +61,14 @@ enable_confirmations = true
 enabled = false
 
 [storage]
-enabled = false
+enabled = true
+file_size_limit = "5MiB"
+
+# Private bucket for user avatars. Kept in sync with
+# supabase/migrations/20260101000004_avatars_storage.sql (that migration is
+# the source of truth for `supabase db push`/remote projects; this section
+# only seeds the same bucket for local `supabase start`).
+[storage.buckets.avatars]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]

@@ -99,28 +99,41 @@ fetch(`${NEST_API_URL}/api/v1/me`, {
 
 Nunca implementar um `/refresh` próprio contra o Nest — o refresh é 100% responsabilidade do SDK do Supabase.
 
-## 10. `GET /api/v1/me`
+## 10. `GET /api/v1/me` e conclusão de perfil
 
 ```json
 {
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "emailVerified": true,
-    "provider": "email"
-  },
+  "id": "uuid",
+  "email": "user@example.com",
+  "emailVerified": true,
+  "providers": ["google"],
   "profile": {
     "firstName": "Ada",
     "lastName": "Lovelace",
     "username": "ada",
     "birthDate": "1990-01-01",
+    "bio": null,
     "avatarUrl": null,
-    "onboardingComplete": false
+    "countryCode": null,
+    "region": null,
+    "city": null
+  },
+  "profileCompletion": {
+    "completed": false,
+    "completedAt": null,
+    "version": 1,
+    "missingFields": ["username", "birthDate"]
+  },
+  "access": {
+    "canUseApplication": false,
+    "redirectTo": "/perfil/completar"
   }
 }
 ```
 
-`onboardingComplete: false` (tipicamente contas Google sem `username`/`birthDate`) é o sinal para o frontend decidir se redireciona para uma tela de onboarding — essa tela não faz parte da Fase 1.
+`access.canUseApplication: false` (tipicamente contas Google sem `username`/`birthDate`) é o sinal para o frontend redirecionar para `access.redirectTo`. Detalhes completos (bootstrap automático, `POST /profile/complete`, `PATCH /profile`, endpoints de avatar, e o guard que bloqueia rotas de negócio com perfil incompleto) estão em **[profile-onboarding.md](profile-onboarding.md)**.
+
+Um `403 { code: "PROFILE_SETUP_REQUIRED", redirectTo: "/perfil/completar" }` em qualquer outra rota da API significa a mesma coisa: o frontend deve redirecionar para a tela de completar cadastro em vez de mostrar um erro genérico.
 
 ## Checklist de segurança do lado do frontend
 

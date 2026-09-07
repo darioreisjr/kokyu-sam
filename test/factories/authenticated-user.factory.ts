@@ -10,9 +10,12 @@ export function buildAuthenticatedUser(
     aal: 'aal1',
     sessionId: 'session-123',
     provider: 'email',
+    providers: ['email'],
+    emailVerified: true,
     accessToken: 'test-access-token',
     issuedAt: new Date('2026-01-01T00:00:00.000Z'),
     expiresAt: new Date('2026-01-01T01:00:00.000Z'),
+    userMetadata: {},
     ...overrides,
   };
 }

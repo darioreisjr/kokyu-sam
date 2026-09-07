@@ -1,7 +1,11 @@
 import { ArgumentsHost, BadRequestException, HttpStatus } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
-import { AuthRequiredError, InternalError } from '../../src/common/errors/app.error';
+import {
+  AuthRequiredError,
+  InternalError,
+  ProfileSetupRequiredError,
+} from '../../src/common/errors/app.error';
 import { ErrorCode } from '../../src/common/errors/error-codes';
 
 function buildHost(request: Record<string, unknown>) {
@@ -71,6 +75,22 @@ describe('GlobalExceptionFilter', () => {
       }),
     );
     expect((logger as unknown as { error: ReturnType<typeof vi.fn> }).error).toHaveBeenCalled();
+  });
+
+  it('merges an AppError.extra payload (e.g. redirectTo) as RFC 7807 extension members', () => {
+    const logger = buildLogger();
+    const filter = new GlobalExceptionFilter(logger);
+    const { host, status, json } = buildHost({ id: 'req-4', url: '/api/v1/missions' });
+
+    filter.catch(new ProfileSetupRequiredError(), host);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: ErrorCode.PROFILE_SETUP_REQUIRED,
+        redirectTo: '/perfil/completar',
+      }),
+    );
   });
 
   it('falls back to an empty requestId when the request has none', () => {

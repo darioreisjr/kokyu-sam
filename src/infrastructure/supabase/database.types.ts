@@ -1,11 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '14.5';
-  };
   graphql_public: {
     Tables: {
       [_ in never]: never;
@@ -35,35 +30,56 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
-          avatar_url: string | null;
+          avatar_external_url: string | null;
+          avatar_path: string | null;
+          bio: string | null;
           birth_date: string | null;
+          city: string | null;
+          country_code: string | null;
           created_at: string;
           first_name: string | null;
           id: string;
           last_name: string | null;
-          onboarding_complete: boolean;
+          onboarding_completed_at: string | null;
+          onboarding_version: number;
+          profile_bootstrapped_at: string | null;
+          region: string | null;
           updated_at: string;
           username: string | null;
         };
         Insert: {
-          avatar_url?: string | null;
+          avatar_external_url?: string | null;
+          avatar_path?: string | null;
+          bio?: string | null;
           birth_date?: string | null;
+          city?: string | null;
+          country_code?: string | null;
           created_at?: string;
           first_name?: string | null;
           id: string;
           last_name?: string | null;
-          onboarding_complete?: boolean;
+          onboarding_completed_at?: string | null;
+          onboarding_version?: number;
+          profile_bootstrapped_at?: string | null;
+          region?: string | null;
           updated_at?: string;
           username?: string | null;
         };
         Update: {
-          avatar_url?: string | null;
+          avatar_external_url?: string | null;
+          avatar_path?: string | null;
+          bio?: string | null;
           birth_date?: string | null;
+          city?: string | null;
+          country_code?: string | null;
           created_at?: string;
           first_name?: string | null;
           id?: string;
           last_name?: string | null;
-          onboarding_complete?: boolean;
+          onboarding_completed_at?: string | null;
+          onboarding_version?: number;
+          profile_bootstrapped_at?: string | null;
+          region?: string | null;
           updated_at?: string;
           username?: string | null;
         };
@@ -74,7 +90,79 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      complete_profile: {
+        Args: {
+          p_bio?: string | null;
+          p_birth_date: string;
+          p_city?: string | null;
+          p_country_code?: string | null;
+          p_first_name: string;
+          p_last_name: string;
+          p_region?: string | null;
+          p_username: string;
+        };
+        Returns: {
+          avatar_external_url: string | null;
+          avatar_path: string | null;
+          bio: string | null;
+          birth_date: string | null;
+          city: string | null;
+          country_code: string | null;
+          created_at: string;
+          first_name: string | null;
+          id: string;
+          last_name: string | null;
+          onboarding_completed_at: string | null;
+          onboarding_version: number;
+          profile_bootstrapped_at: string | null;
+          region: string | null;
+          updated_at: string;
+          username: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'profiles';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      is_username_available: { Args: { p_username: string }; Returns: boolean };
+      update_profile: {
+        Args: {
+          p_bio?: string | null;
+          p_birth_date: string;
+          p_city?: string | null;
+          p_country_code?: string | null;
+          p_first_name: string;
+          p_last_name: string;
+          p_region?: string | null;
+          p_username: string;
+        };
+        Returns: {
+          avatar_external_url: string | null;
+          avatar_path: string | null;
+          bio: string | null;
+          birth_date: string | null;
+          city: string | null;
+          country_code: string | null;
+          created_at: string;
+          first_name: string | null;
+          id: string;
+          last_name: string | null;
+          onboarding_completed_at: string | null;
+          onboarding_version: number;
+          profile_bootstrapped_at: string | null;
+          region: string | null;
+          updated_at: string;
+          username: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'profiles';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;

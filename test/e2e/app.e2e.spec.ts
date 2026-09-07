@@ -13,7 +13,7 @@ interface ErrorBody {
 }
 
 interface MeResponseBody {
-  user: { id: string };
+  id: string;
   profile: { username: string | null };
 }
 
@@ -30,8 +30,21 @@ const USER_A: FakeUser = {
     last_name: 'A',
     username: 'user_a',
     birth_date: '1990-01-01',
-    avatar_url: null,
-    onboarding_complete: true,
+    bio: null,
+    avatar_path: null,
+    avatar_external_url: null,
+    country_code: null,
+    region: null,
+    city: null,
+    onboarding_completed_at: '2026-01-01T00:00:00.000Z',
+    onboarding_version: 1,
+    // Already bootstrapped with every fillable field present, so
+    // ProfileBootstrapService.maybeBootstrap short-circuits without
+    // needing this fake client to support `.update()` - see
+    // FakeSupabaseClientFactoryService below, which only implements the
+    // read path (this suite covers the HTTP stack, not every repository
+    // branch - those are unit-tested separately).
+    profile_bootstrapped_at: '2026-01-01T00:00:00.000Z',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
   },
@@ -45,8 +58,15 @@ const USER_B: FakeUser = {
     last_name: 'B',
     username: 'user_b',
     birth_date: '1992-02-02',
-    avatar_url: null,
-    onboarding_complete: false,
+    bio: null,
+    avatar_path: null,
+    avatar_external_url: null,
+    country_code: null,
+    region: null,
+    city: null,
+    onboarding_completed_at: null,
+    onboarding_version: 0,
+    profile_bootstrapped_at: '2026-01-01T00:00:00.000Z',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
   },
@@ -146,7 +166,7 @@ describe('Kokyu API (e2e)', () => {
 
     const body = response.body as MeResponseBody;
     expect(response.status).toBe(200);
-    expect(body.user.id).toBe(USER_A.id);
+    expect(body.id).toBe(USER_A.id);
     expect(body.profile.username).toBe('user_a');
   });
 
@@ -157,7 +177,7 @@ describe('Kokyu API (e2e)', () => {
 
     const body = response.body as MeResponseBody;
     expect(response.status).toBe(200);
-    expect(body.user.id).toBe(USER_B.id);
+    expect(body.id).toBe(USER_B.id);
     expect(body.profile.username).toBe('user_b');
   });
 

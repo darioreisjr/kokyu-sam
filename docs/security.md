@@ -23,7 +23,7 @@
 
 ## Códigos de erro estáveis
 
-`AUTH_REQUIRED`, `TOKEN_INVALID`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `EMAIL_NOT_CONFIRMED`, `USERNAME_TAKEN`, `VALIDATION_ERROR`, `PROFILE_NOT_FOUND`, `RATE_LIMITED`, `INTERNAL_ERROR` — ver `src/common/errors/error-codes.ts`. Nunca renomear sem versionar a API.
+`AUTH_REQUIRED`, `TOKEN_INVALID`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `EMAIL_NOT_CONFIRMED`, `USERNAME_TAKEN`, `VALIDATION_ERROR`, `PROFILE_NOT_FOUND`, `RATE_LIMITED`, `INTERNAL_ERROR`, `PROFILE_SETUP_REQUIRED`, `USERNAME_INVALID`, `BIRTH_DATE_INVALID`, `AGE_REQUIREMENT_NOT_MET`, `PROFILE_VALIDATION_ERROR`, `AVATAR_INVALID`, `AVATAR_TOO_LARGE` — ver `src/common/errors/error-codes.ts`. Nunca renomear sem versionar a API. Detalhes do onboarding de perfil (`PROFILE_SETUP_REQUIRED` + `redirectTo`, mapeamento de `23505`/`KO001`) em [profile-onboarding.md](profile-onboarding.md).
 
 Nenhuma resposta de erro inclui stack trace, SQL, detalhes internos do Supabase, variáveis de ambiente ou paths locais — `GlobalExceptionFilter` reduz qualquer erro não mapeado a `INTERNAL_ERROR` genérico, logando o erro completo apenas no servidor.
 
@@ -46,7 +46,7 @@ Allowlist explícita via `CORS_ORIGINS` (nunca `*` em produção). Apenas os mé
 
 ## Rate limiting
 
-`@nestjs/throttler` global como complemento — **não** é a proteção primária, já que rate limit em memória de uma Function não é uma proteção distribuída quando há múltiplas instâncias na Vercel. A proteção real de auth (signup, login, recovery) é o rate limit nativo do Supabase Auth, que deve ser revisado antes de produção (`supabase/config.toml [auth.rate_limit]` localmente; painel do projeto em produção). Se necessário no futuro, considerar Vercel Firewall ou um store distribuído — não adicionar Redis nesta fase sem necessidade real.
+`@nestjs/throttler` global como complemento — **não** é a proteção primária, já que rate limit em memória de uma Function não é uma proteção distribuída quando há múltiplas instâncias na Vercel. A proteção real de auth (signup, login, recovery) é o rate limit nativo do Supabase Auth, que deve ser revisado antes de produção (`supabase/config.toml [auth.rate_limit]` localmente; painel do projeto em produção). `GET /usernames/availability` e `POST /profile/avatar/upload-url` usam `@Throttle()` com um limite mais restrito por rota (espelhando `authConfig.throttle.sensitive`), por serem baratos de martelar/enumerar. Se necessário no futuro, considerar Vercel Firewall ou um store distribuído — não adicionar Redis nesta fase sem necessidade real.
 
 ## CAPTCHA
 
@@ -64,6 +64,8 @@ Nenhum endpoint deve permitir descobrir se um e-mail existe: signup e forgot-pas
 - `anon` não tem grant algum na tabela.
 - Least privilege revisado explicitamente com `REVOKE`/`GRANT`, não só policies — ver `supabase/migrations/20260101000000_create_profiles.sql`.
 - Testes de RLS em `supabase/tests/profiles_rls.test.sql` (pgTAP, `pnpm db:lint` / `supabase test db`).
+- Escrita de campos de onboarding (`complete_profile`/`update_profile`) e checagem de username (`is_username_available`) passam por RPCs `SECURITY DEFINER` identificadas só por `auth.uid()` (nunca um parâmetro de user id) — detalhes em [profile-onboarding.md](profile-onboarding.md).
+- Bucket de Storage `avatars` é privado, com RLS restringindo cada usuário a `avatars/<auth.uid()>/*` (`supabase/migrations/20260101000004_avatars_storage.sql`). Nunca existe uma avatar URL pública persistida — só um `avatar_path` interno, resolvido para uma signed URL de curta duração em tempo de leitura.
 
 ## Trigger `handle_new_user()`
 

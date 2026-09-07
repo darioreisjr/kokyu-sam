@@ -10,6 +10,7 @@ import { validateEnv } from './config/env.schema';
 import { buildPinoConfig } from './common/logger/pino.config';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SupabaseAuthGuard } from './common/auth/guards/supabase-auth.guard';
+import { ProfileCompleteGuard } from './common/auth/guards/profile-complete.guard';
 import { SupabaseModule } from './infrastructure/supabase/supabase.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
@@ -43,8 +44,11 @@ import { HealthModule } from './modules/health/health.module';
     HealthModule,
   ],
   providers: [
+    // Registration order matters for APP_GUARD: Throttler -> SupabaseAuth
+    // (attaches request.user) -> ProfileComplete (needs request.user).
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupabaseAuthGuard },
+    { provide: APP_GUARD, useClass: ProfileCompleteGuard },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })

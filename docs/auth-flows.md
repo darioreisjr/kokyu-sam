@@ -63,7 +63,7 @@ Next.js → supabase.auth.signInWithOAuth({ provider: 'google', options: { redir
 - Scopes mínimos: `openid email profile`. Nunca solicitar Drive/Calendar/Gmail nesta fase.
 - `redirectTo` **nunca** é um valor arbitrário vindo do usuário — sempre uma allowlist fixa (`/app`, `/login`, `/reset-password`, etc.), nunca um domínio externo.
 - Se a conta Google usa o mesmo e-mail de uma conta já existente, o identity linking é feito pelo próprio Supabase — não criamos lógica manual baseada em e-mail.
-- Um usuário Google pode chegar sem `username`/`birthDate`. Nesse caso o profile existe, mas `onboardingComplete = false`; o frontend decide se/quando redirecionar para completar o cadastro (tela não implementada nesta fase).
+- Um usuário Google pode chegar sem `username`/`birthDate`. Nesse caso o profile existe, mas `profileCompletion.completed = false` em `GET /api/v1/me` (ver [profile-onboarding.md](profile-onboarding.md)); o frontend usa `access.redirectTo` para levar o usuário à tela de completar cadastro.
 
 Checklist manual de smoke test (login real do Google não é automatizado em CI):
 
@@ -106,9 +106,9 @@ O Nest é stateless e não mantém nenhum session store paralelo — não existe
 
 Gerenciado inteiramente pelo SDK do Supabase no frontend. O Nest nunca usa o refresh token do usuário; se o access token expirou, o Nest responde `401 TOKEN_EXPIRED` e cabe ao frontend (via Supabase SDK) renovar e repetir a chamada.
 
-## 10. `GET /api/v1/me`
+## 10. `GET /api/v1/me` e conclusão de perfil
 
-Único endpoint desta fase que o Nest expõe além de `/api/health`. Contrato completo em [frontend-auth-integration.md](frontend-auth-integration.md).
+Depois que o Supabase autentica a sessão, o Nest ainda decide se o usuário pode usar o app: todo perfil precisa ser completado (`POST /api/v1/profile/complete`) antes de acessar rotas de negócio. Esse gate (`ProfileCompleteGuard`), o bootstrap automático de campos a partir de `user_metadata`, o contrato completo de `GET /api/v1/me` e os demais endpoints de perfil/avatar estão documentados em **[profile-onboarding.md](profile-onboarding.md)** — não duplicado aqui. Contrato de resposta também referenciado em [frontend-auth-integration.md](frontend-auth-integration.md).
 
 ## Operações futuras (documentadas, não implementadas)
 

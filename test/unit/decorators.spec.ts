@@ -2,6 +2,10 @@ import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { ExecutionContext } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import { IS_PUBLIC_KEY, Public } from '../../src/common/auth/decorators/public.decorator';
+import {
+  ALLOW_INCOMPLETE_PROFILE_KEY,
+  AllowIncompleteProfile,
+} from '../../src/common/auth/decorators/allow-incomplete-profile.decorator';
 import { CurrentUser } from '../../src/common/auth/decorators/current-user.decorator';
 import { buildAuthenticatedUser } from '../factories/authenticated-user.factory';
 
@@ -13,6 +17,19 @@ describe('@Public()', () => {
     }
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, Controller.prototype.handler)).toBe(true);
+  });
+});
+
+describe('@AllowIncompleteProfile()', () => {
+  it('sets the ALLOW_INCOMPLETE_PROFILE_KEY metadata to true on the target', () => {
+    class Controller {
+      @AllowIncompleteProfile()
+      handler(): void {}
+    }
+
+    expect(Reflect.getMetadata(ALLOW_INCOMPLETE_PROFILE_KEY, Controller.prototype.handler)).toBe(
+      true,
+    );
   });
 });
 

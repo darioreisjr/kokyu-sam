@@ -64,7 +64,13 @@ Cria dois usuários reais via Admin API (`email_confirm: true`, sem depender de 
 - usuário A lê o próprio profile;
 - usuário A não lê o profile de B;
 - `UPDATE` de A contra a linha de B afeta 0 linhas (RLS filtra, não lança erro);
-- `anon` não enxerga nenhuma linha e não tem privilégio de `INSERT`.
+- `anon` não enxerga nenhuma linha e não tem privilégio de `INSERT`/`SELECT`;
+- `complete_profile()`/`update_profile()` só afetam a própria linha do chamador (`auth.uid()`, nunca um parâmetro de id);
+- unicidade de username é case-insensitive, inclusive via RPC (`23505`);
+- `update_profile()` recusa nulificar campo obrigatório depois que o onboarding já está completo (`KO001`);
+- `is_username_available()` nunca revela quem é o dono.
+
+Detalhes do onboarding de perfil (guard, bootstrap, contrato `CurrentUser`) em [profile-onboarding.md](profile-onboarding.md), que também documenta as suítes unitárias/integração específicas (`ProfileCompletionService`, `ProfileBootstrapService`, `ProfileCompleteGuard`, fluxo de avatar) não repetidas aqui.
 
 ## Google OAuth
 

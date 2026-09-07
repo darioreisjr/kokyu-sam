@@ -13,4 +13,6 @@ export interface ProblemDetails {
   detail: string;
   instance: string;
   requestId: string;
+  /** RFC 7807 extension members (e.g. `redirectTo`, `missingFields`). */
+  [extension: string]: unknown;
 }

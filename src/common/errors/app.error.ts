@@ -12,6 +12,12 @@ export class AppError extends Error {
     public readonly code: ErrorCode,
     public readonly status: HttpStatus,
     message: string,
+    /**
+     * Optional RFC 7807 extension members merged into the response body
+     * (e.g. `redirectTo`, `missingFields`). Keep this small and public -
+     * never put internal details here, only values already safe to expose.
+     */
+    public readonly extra?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'AppError';
@@ -45,5 +51,59 @@ export class ProfileNotFoundError extends AppError {
 export class InternalError extends AppError {
   constructor(message = 'An unexpected error occurred.') {
     super(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, message);
+  }
+}
+
+export class UsernameTakenError extends AppError {
+  constructor(message = 'This username is already taken.') {
+    super(ErrorCode.USERNAME_TAKEN, HttpStatus.CONFLICT, message);
+  }
+}
+
+export class UsernameInvalidError extends AppError {
+  constructor(message = 'Invalid username.') {
+    super(ErrorCode.USERNAME_INVALID, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class BirthDateInvalidError extends AppError {
+  constructor(message = 'Invalid birth date.') {
+    super(ErrorCode.BIRTH_DATE_INVALID, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class AgeRequirementNotMetError extends AppError {
+  constructor(message = 'You must be at least 18 years old.') {
+    super(ErrorCode.AGE_REQUIREMENT_NOT_MET, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class ProfileValidationError extends AppError {
+  constructor(message = 'The profile could not be updated with the provided data.') {
+    super(ErrorCode.PROFILE_VALIDATION_ERROR, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class AvatarInvalidError extends AppError {
+  constructor(message = 'Invalid avatar file.') {
+    super(ErrorCode.AVATAR_INVALID, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class AvatarTooLargeError extends AppError {
+  constructor(message = 'Avatar file is too large.') {
+    super(ErrorCode.AVATAR_TOO_LARGE, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+/**
+ * Thrown by ProfileCompleteGuard when a caller with an incomplete profile
+ * hits a business route that isn't `@AllowIncompleteProfile()`. Carries
+ * `redirectTo` as an RFC 7807 extension member so the frontend can route
+ * the user straight to onboarding without special-casing the error code.
+ */
+export class ProfileSetupRequiredError extends AppError {
+  constructor(redirectTo = '/perfil/completar', message = 'Profile setup is required.') {
+    super(ErrorCode.PROFILE_SETUP_REQUIRED, HttpStatus.FORBIDDEN, message, { redirectTo });
   }
 }
