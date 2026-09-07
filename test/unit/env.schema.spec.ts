@@ -17,7 +17,7 @@ describe('validateEnv', () => {
 
     expect(config.PORT).toBe(3000);
     expect(config.API_PREFIX).toBe('api');
-    expect(config.CORS_ORIGINS).toEqual(['http://localhost:3001', 'http://localhost:3002']);
+    expect(config.CORS_ORIGINS).toBe('http://localhost:3001,http://localhost:3002');
     expect(config.SUPABASE_SECRET_KEY).toBeUndefined();
   });
 

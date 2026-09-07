@@ -12,11 +12,10 @@ export const appConfig = registerAs('app', () => {
     name: env.APP_NAME,
     url: env.APP_URL,
     frontendUrl: env.FRONTEND_URL,
-    corsOrigins: Array.isArray(env.CORS_ORIGINS)
-      ? env.CORS_ORIGINS
-      : String(env.CORS_ORIGINS)
-          .split(',')
-          .map((o) => o.trim()),
+    corsOrigins: String(env.CORS_ORIGINS)
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
     logLevel: env.LOG_LEVEL,
     isProduction: env.NODE_ENV === 'production',
   };

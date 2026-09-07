@@ -14,15 +14,14 @@ export const envSchema = z.object({
   APP_NAME: z.string().min(1).default('kokyu-api'),
   APP_URL: z.string().url(),
   FRONTEND_URL: z.string().url(),
-  CORS_ORIGINS: z
-    .string()
-    .min(1)
-    .transform((value) =>
-      value
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean),
-    ),
+  // Stays a plain validated string (never `.transform()`ed into an array)
+  // — `@nestjs/config`'s `assignVariablesToProcess` only round-trips
+  // primitive values back onto `process.env` after validation; an array
+  // here is silently dropped, leaving `process.env.CORS_ORIGINS`
+  // `undefined` at runtime regardless of the real `.env` value. Splitting
+  // into an allowlist happens once, in `app.config.ts`, from this raw
+  // string.
+  CORS_ORIGINS: z.string().min(1),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   SUPABASE_URL: z.string().url(),
