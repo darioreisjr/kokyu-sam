@@ -58,6 +58,17 @@ export class LeisureItemDto {
   archivedAt!: string | null;
 }
 
+export class LeisureCoverUploadUrlResponseDto {
+  @ApiProperty({ description: 'Storage object path the client must upload to.' })
+  path!: string;
+
+  @ApiProperty({ description: 'One-time token to pair with the signed upload URL.' })
+  token!: string;
+
+  @ApiProperty({ description: 'Signed URL the client PUTs the file to directly.' })
+  signedUrl!: string;
+}
+
 /**
  * The actual wire shape adds one more key, named by `type` (e.g.
  * `movie: { runtime: 120 }`) - never a generic `details` key, matching the

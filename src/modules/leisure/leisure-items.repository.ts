@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { InternalError } from '../../common/errors/app.error';
 import { mapSupabaseError } from '../../common/errors/supabase-error.mapper';
 import { SupabaseClientFactoryService } from '../../infrastructure/supabase/supabase-client.factory.service';
 import { Database, Json } from '../../infrastructure/supabase/database.types';
@@ -9,9 +11,14 @@ import {
   LeisureItemListFilter,
   LeisureItemUpdateInput,
 } from './types/leisure-item.type';
-import { LeisureItemsRepository } from './types/leisure-items-repository.interface';
+import {
+  LeisureCoverUploadTarget,
+  LeisureItemsRepository,
+} from './types/leisure-items-repository.interface';
 
 type LeisureItemRow = Database['public']['Tables']['leisure_items']['Row'];
+
+const LEISURE_COVERS_BUCKET = 'leisure-covers';
 
 /**
  * Supabase-backed implementation of LeisureItemsRepository. Always queries
@@ -127,6 +134,25 @@ export class SupabaseLeisureItemsRepository implements LeisureItemsRepository {
 
     const { error } = await client.from('leisure_items').delete().eq('id', id);
     if (error) throw mapSupabaseError(error);
+  }
+
+  async createCoverUploadUrl(
+    accessToken: string,
+    userId: string,
+    fileExtension: string,
+  ): Promise<LeisureCoverUploadTarget> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+    const path = `${userId}/${randomUUID()}.${fileExtension}`;
+
+    const { data, error } = await client.storage
+      .from(LEISURE_COVERS_BUCKET)
+      .createSignedUploadUrl(path);
+
+    if (error) {
+      throw new InternalError();
+    }
+
+    return { path: data.path, token: data.token, signedUrl: data.signedUrl };
   }
 
   private toDomain(row: LeisureItemRow): LeisureItem {

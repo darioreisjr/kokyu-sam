@@ -61,6 +61,27 @@ export const updateLeisureItemSchema = baseFieldsSchema
   })
   .transform((data) => toUpdateInput(data));
 
+const COVER_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+const COVER_MIME_TO_EXTENSION: Record<(typeof COVER_MIME_TYPES)[number], string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+export const coverUploadUrlSchema = z
+  .object({
+    contentType: z.enum(COVER_MIME_TYPES, {
+      errorMap: () => ({ message: 'contentType must be image/png, image/jpeg or image/webp.' }),
+    }),
+  })
+  .strict();
+
+export type CoverUploadUrlBody = z.infer<typeof coverUploadUrlSchema>;
+
+export function extensionForCoverMimeType(contentType: CoverUploadUrlBody['contentType']): string {
+  return COVER_MIME_TO_EXTENSION[contentType];
+}
+
 export const listLeisureItemsQuerySchema = z
   .object({
     type: z.enum(LEISURE_ITEM_TYPES).optional(),

@@ -8,11 +8,14 @@ import { LEISURE_ITEM_DETAILS_SCHEMAS } from './schemas/leisure-item-details.sch
 import { LeisureItem, LeisureItemListFilter } from './types/leisure-item.type';
 import {
   LEISURE_ITEMS_REPOSITORY,
+  LeisureCoverUploadTarget,
   LeisureItemsRepository,
 } from './types/leisure-items-repository.interface';
 import {
+  CoverUploadUrlBody,
   ReclassifyLeisureItemBody,
   UpdateLeisureItemProgressBody,
+  extensionForCoverMimeType,
 } from './schemas/leisure-item.schemas';
 import { LeisureItemCreateInput, LeisureItemUpdateInput } from './types/leisure-item.type';
 
@@ -95,5 +98,13 @@ export class LeisureItemsService {
     body: ReclassifyLeisureItemBody,
   ): Promise<LeisureItem> {
     return this.update(user, id, { type: body.type, details: body.details });
+  }
+
+  createCoverUploadUrl(
+    user: AuthenticatedUser,
+    body: CoverUploadUrlBody,
+  ): Promise<LeisureCoverUploadTarget> {
+    const extension = extensionForCoverMimeType(body.contentType);
+    return this.repository.createCoverUploadUrl(user.accessToken, user.id, extension);
   }
 }

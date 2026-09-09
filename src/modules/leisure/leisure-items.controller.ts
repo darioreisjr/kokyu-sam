@@ -17,16 +17,23 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/auth/types/authenticated-user.type';
 import { UuidParam } from '../../common/utils/uuid-param.schema';
 import { ZodValidationPipe } from '../../common/utils/zod-validation.pipe';
 import { LeisureItemsService } from './leisure-items.service';
-import { LeisureItemDto, LeisureItemResponse } from './schemas/leisure-item.dto';
 import {
+  LeisureCoverUploadUrlResponseDto,
+  LeisureItemDto,
+  LeisureItemResponse,
+} from './schemas/leisure-item.dto';
+import {
+  CoverUploadUrlBody,
   ListLeisureItemsQuery,
   ReclassifyLeisureItemBody,
   UpdateLeisureItemProgressBody,
+  coverUploadUrlSchema,
   createLeisureItemSchema,
   listLeisureItemsQuerySchema,
   reclassifyLeisureItemSchema,
@@ -38,6 +45,7 @@ import {
   LeisureItemCreateInput,
   LeisureItemUpdateInput,
 } from './types/leisure-item.type';
+import { LeisureCoverUploadTarget } from './types/leisure-items-repository.interface';
 
 @ApiTags('leisure')
 @ApiBearerAuth()
@@ -143,6 +151,22 @@ export class LeisureItemsController {
   ): Promise<LeisureItemResponse> {
     const item = await this.service.updateProgress(user, params.id, body);
     return this.toResponse(item);
+  }
+
+  @Post('covers/upload-url')
+  // Mirrors profile's avatar upload-url throttle - stricter than the
+  // global default since this is otherwise cheap to hammer.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      "Returns a signed Storage upload URL scoped to the caller's own leisure-covers/<uid>/ folder. The bucket is public, so after uploading the client resolves the final `coverImage` URL itself (getPublicUrl) - no confirm step.",
+  })
+  @ApiOkResponse({ type: LeisureCoverUploadUrlResponseDto })
+  createCoverUploadUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(coverUploadUrlSchema)) body: CoverUploadUrlBody,
+  ): Promise<LeisureCoverUploadTarget> {
+    return this.service.createCoverUploadUrl(user, body);
   }
 
   @Post(':id/reclassify')
