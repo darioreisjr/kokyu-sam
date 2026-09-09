@@ -16,6 +16,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { HealthModule } from './modules/health/health.module';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
+import { LeisureModule } from './modules/leisure/leisure.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module
     ProfilesModule,
     HealthModule,
     FeatureFlagsModule,
+    LeisureModule,
   ],
   providers: [
     // Registration order matters for APP_GUARD: Throttler -> SupabaseAuth

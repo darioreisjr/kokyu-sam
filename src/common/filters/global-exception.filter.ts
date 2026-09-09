@@ -25,6 +25,11 @@ const TITLES_BY_CODE: Record<ErrorCode, string> = {
   [ErrorCode.PROFILE_VALIDATION_ERROR]: 'Profile validation error',
   [ErrorCode.AVATAR_INVALID]: 'Invalid avatar',
   [ErrorCode.AVATAR_TOO_LARGE]: 'Avatar too large',
+  [ErrorCode.LEISURE_ITEM_NOT_FOUND]: 'Leisure item not found',
+  [ErrorCode.LEISURE_ITEM_DETAILS_INVALID]: 'Leisure item details invalid',
+  [ErrorCode.LEISURE_PLAN_ENTRY_NOT_FOUND]: 'Leisure plan entry not found',
+  [ErrorCode.LEISURE_NOTE_NOT_FOUND]: 'Leisure note not found',
+  [ErrorCode.LEISURE_COLLECTION_NOT_FOUND]: 'Leisure collection not found',
 };
 
 /**

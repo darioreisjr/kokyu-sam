@@ -107,3 +107,33 @@ export class ProfileSetupRequiredError extends AppError {
     super(ErrorCode.PROFILE_SETUP_REQUIRED, HttpStatus.FORBIDDEN, message, { redirectTo });
   }
 }
+
+export class LeisureItemNotFoundError extends AppError {
+  constructor(message = 'Leisure item not found.') {
+    super(ErrorCode.LEISURE_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND, message);
+  }
+}
+
+export class LeisureItemDetailsInvalidError extends AppError {
+  constructor(message = 'Leisure item details are invalid for this item type.') {
+    super(ErrorCode.LEISURE_ITEM_DETAILS_INVALID, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
+export class LeisurePlanEntryNotFoundError extends AppError {
+  constructor(message = 'Leisure plan entry not found.') {
+    super(ErrorCode.LEISURE_PLAN_ENTRY_NOT_FOUND, HttpStatus.NOT_FOUND, message);
+  }
+}
+
+export class LeisureNoteNotFoundError extends AppError {
+  constructor(message = 'Leisure note not found.') {
+    super(ErrorCode.LEISURE_NOTE_NOT_FOUND, HttpStatus.NOT_FOUND, message);
+  }
+}
+
+export class LeisureCollectionNotFoundError extends AppError {
+  constructor(message = 'Leisure collection not found.') {
+    super(ErrorCode.LEISURE_COLLECTION_NOT_FOUND, HttpStatus.NOT_FOUND, message);
+  }
+}
