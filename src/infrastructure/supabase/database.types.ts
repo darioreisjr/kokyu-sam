@@ -28,6 +28,303 @@ export type Database = {
   };
   public: {
     Tables: {
+      leisure_collection_items: {
+        Row: {
+          added_at: string;
+          collection_id: string;
+          item_id: string;
+          user_id: string;
+        };
+        Insert: {
+          added_at?: string;
+          collection_id: string;
+          item_id: string;
+          user_id: string;
+        };
+        Update: {
+          added_at?: string;
+          collection_id?: string;
+          item_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leisure_collection_items_collection_id_fkey';
+            columns: ['collection_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_collections';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'leisure_collection_items_item_id_fkey';
+            columns: ['item_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_items';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      leisure_collections: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          name: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      leisure_items: {
+        Row: {
+          archived_at: string | null;
+          cover_image: string | null;
+          created_at: string;
+          description: string | null;
+          details: Json;
+          duration_type: string;
+          estimated_duration: number | null;
+          favorite: boolean;
+          id: string;
+          minimum_useful_duration: number | null;
+          priority: string | null;
+          recommended_by: string | null;
+          source: string | null;
+          source_url: string | null;
+          status: string;
+          tags: string[];
+          title: string;
+          type: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          archived_at?: string | null;
+          cover_image?: string | null;
+          created_at?: string;
+          description?: string | null;
+          details?: Json;
+          duration_type?: string;
+          estimated_duration?: number | null;
+          favorite?: boolean;
+          id?: string;
+          minimum_useful_duration?: number | null;
+          priority?: string | null;
+          recommended_by?: string | null;
+          source?: string | null;
+          source_url?: string | null;
+          status?: string;
+          tags?: string[];
+          title: string;
+          type: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          archived_at?: string | null;
+          cover_image?: string | null;
+          created_at?: string;
+          description?: string | null;
+          details?: Json;
+          duration_type?: string;
+          estimated_duration?: number | null;
+          favorite?: boolean;
+          id?: string;
+          minimum_useful_duration?: number | null;
+          priority?: string | null;
+          recommended_by?: string | null;
+          source?: string | null;
+          source_url?: string | null;
+          status?: string;
+          tags?: string[];
+          title?: string;
+          type?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      leisure_log_entries: {
+        Row: {
+          activity_type: string;
+          completed_at: string;
+          created_at: string;
+          duration: number | null;
+          id: string;
+          leisure_item_id: string | null;
+          notes: string | null;
+          rating: number | null;
+          started_at: string | null;
+          title: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_type: string;
+          completed_at: string;
+          created_at?: string;
+          duration?: number | null;
+          id?: string;
+          leisure_item_id?: string | null;
+          notes?: string | null;
+          rating?: number | null;
+          started_at?: string | null;
+          title: string;
+          user_id: string;
+        };
+        Update: {
+          activity_type?: string;
+          completed_at?: string;
+          created_at?: string;
+          duration?: number | null;
+          id?: string;
+          leisure_item_id?: string | null;
+          notes?: string | null;
+          rating?: number | null;
+          started_at?: string | null;
+          title?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leisure_log_entries_leisure_item_id_fkey';
+            columns: ['leisure_item_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_items';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      leisure_notes: {
+        Row: {
+          archived: boolean;
+          checklist_items: Json;
+          content: string;
+          created_at: string;
+          id: string;
+          link_url: string | null;
+          pinned: boolean;
+          related_leisure_item_id: string | null;
+          reminder_date: string | null;
+          tags: string[];
+          title: string | null;
+          type: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          archived?: boolean;
+          checklist_items?: Json;
+          content?: string;
+          created_at?: string;
+          id?: string;
+          link_url?: string | null;
+          pinned?: boolean;
+          related_leisure_item_id?: string | null;
+          reminder_date?: string | null;
+          tags?: string[];
+          title?: string | null;
+          type?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          archived?: boolean;
+          checklist_items?: Json;
+          content?: string;
+          created_at?: string;
+          id?: string;
+          link_url?: string | null;
+          pinned?: boolean;
+          related_leisure_item_id?: string | null;
+          reminder_date?: string | null;
+          tags?: string[];
+          title?: string | null;
+          type?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leisure_notes_related_leisure_item_id_fkey';
+            columns: ['related_leisure_item_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_items';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      leisure_plan_entries: {
+        Row: {
+          completed: boolean;
+          created_at: string;
+          date: string;
+          duration: number | null;
+          end_time: string | null;
+          id: string;
+          leisure_item_id: string | null;
+          notes: string | null;
+          recurrence: string;
+          reminder: boolean;
+          start_time: string | null;
+          title: string;
+          user_id: string;
+        };
+        Insert: {
+          completed?: boolean;
+          created_at?: string;
+          date: string;
+          duration?: number | null;
+          end_time?: string | null;
+          id?: string;
+          leisure_item_id?: string | null;
+          notes?: string | null;
+          recurrence?: string;
+          reminder?: boolean;
+          start_time?: string | null;
+          title: string;
+          user_id: string;
+        };
+        Update: {
+          completed?: boolean;
+          created_at?: string;
+          date?: string;
+          duration?: number | null;
+          end_time?: string | null;
+          id?: string;
+          leisure_item_id?: string | null;
+          notes?: string | null;
+          recurrence?: string;
+          reminder?: boolean;
+          start_time?: string | null;
+          title?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leisure_plan_entries_leisure_item_id_fkey';
+            columns: ['leisure_item_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_items';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_external_url: string | null;
@@ -92,13 +389,13 @@ export type Database = {
     Functions: {
       complete_profile: {
         Args: {
-          p_bio?: string | null;
+          p_bio?: string;
           p_birth_date: string;
-          p_city?: string | null;
-          p_country_code?: string | null;
+          p_city?: string;
+          p_country_code?: string;
           p_first_name: string;
           p_last_name: string;
-          p_region?: string | null;
+          p_region?: string;
           p_username: string;
         };
         Returns: {
@@ -129,13 +426,13 @@ export type Database = {
       is_username_available: { Args: { p_username: string }; Returns: boolean };
       update_profile: {
         Args: {
-          p_bio?: string | null;
+          p_bio?: string;
           p_birth_date: string;
-          p_city?: string | null;
-          p_country_code?: string | null;
+          p_city?: string;
+          p_country_code?: string;
           p_first_name: string;
           p_last_name: string;
-          p_region?: string | null;
+          p_region?: string;
           p_username: string;
         };
         Returns: {

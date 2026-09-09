@@ -103,10 +103,10 @@ export class SupabaseProfilesRepository implements ProfilesRepository {
       p_last_name: input.lastName,
       p_username: input.username,
       p_birth_date: input.birthDate,
-      p_bio: input.bio,
-      p_country_code: input.countryCode,
-      p_region: input.region,
-      p_city: input.city,
+      p_bio: input.bio ?? undefined,
+      p_country_code: input.countryCode ?? undefined,
+      p_region: input.region ?? undefined,
+      p_city: input.city ?? undefined,
     });
 
     if (error) {
@@ -127,10 +127,10 @@ export class SupabaseProfilesRepository implements ProfilesRepository {
       p_last_name: input.lastName,
       p_username: input.username,
       p_birth_date: input.birthDate,
-      p_bio: input.bio,
-      p_country_code: input.countryCode,
-      p_region: input.region,
-      p_city: input.city,
+      p_bio: input.bio ?? undefined,
+      p_country_code: input.countryCode ?? undefined,
+      p_region: input.region ?? undefined,
+      p_city: input.city ?? undefined,
     });
 
     if (error) {
