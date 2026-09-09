@@ -359,6 +359,56 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect(body.backlogCount).toBeGreaterThanOrEqual(1);
   });
 
+  it('cover upload flow: upload-url is scoped to the caller, the uploaded object is publicly readable, and the resulting URL saves as coverImage', async () => {
+    const { userId, accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+
+    const uploadUrl = await auth(
+      request(server()).post('/api/v1/leisure/items/covers/upload-url'),
+    ).send({ contentType: 'image/png' });
+    expect(uploadUrl.status).toBe(201);
+    const target = uploadUrl.body as { path: string; token: string; signedUrl: string };
+    expect(target.path.startsWith(`${userId}/`)).toBe(true);
+
+    // Actually PUT a tiny file to the signed URL, same as the avatar flow test.
+    const uploadTarget = target.signedUrl.startsWith('http')
+      ? target.signedUrl
+      : `${SUPABASE_URL}${target.signedUrl}`;
+    const putResponse = await fetch(uploadTarget, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'image/png' },
+      body: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+    });
+    expect(putResponse.status).toBeLessThan(300);
+
+    // The bucket is public - no signing/backend round trip needed to read it.
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/leisure-covers/${target.path}`;
+    const publicRead = await fetch(publicUrl);
+    expect(publicRead.status).toBe(200);
+
+    const created = await auth(request(server()).post('/api/v1/leisure/items')).send({
+      type: 'movie',
+      title: 'Com capa',
+      durationType: 'unknown',
+      coverImage: publicUrl,
+      movie: {},
+    });
+    expect(created.status).toBe(201);
+    expect((created.body as { coverImage: string }).coverImage).toBe(publicUrl);
+  });
+
+  it('rejects a cover upload-url request with an unsupported content type', async () => {
+    const { accessToken } = await createConfirmedUser();
+
+    const response = await request(server())
+      .post('/api/v1/leisure/items/covers/upload-url')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ contentType: 'application/pdf' });
+
+    expect(response.status).toBe(400);
+    expect((response.body as { code: string }).code).toBe('VALIDATION_ERROR');
+  });
+
   it('never lets User A see or mutate User B leisure data', async () => {
     const userA = await createConfirmedUser();
     const userB = await createConfirmedUser();

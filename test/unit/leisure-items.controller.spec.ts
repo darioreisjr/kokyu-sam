@@ -41,6 +41,9 @@ function buildService(overrides: Partial<Record<keyof LeisureItemsService, unkno
     archive: vi.fn().mockResolvedValue(buildItem({ status: 'archived' })),
     updateProgress: vi.fn().mockResolvedValue(buildItem({ details: { currentPage: 10 } })),
     reclassify: vi.fn().mockResolvedValue(buildItem({ type: 'book' })),
+    createCoverUploadUrl: vi
+      .fn()
+      .mockResolvedValue({ path: 'user-1/cover.png', token: 'tok', signedUrl: 'https://upload' }),
     ...overrides,
   } as unknown as LeisureItemsService;
 }
@@ -165,5 +168,18 @@ describe('LeisureItemsController.reclassify', () => {
 
     expect(service.reclassify).toHaveBeenCalledWith(user, 'item-1', body);
     expect(result).toEqual(expect.objectContaining({ book: { runtime: 120 } }));
+  });
+});
+
+describe('LeisureItemsController.createCoverUploadUrl', () => {
+  it('delegates to the service and returns the signed upload target', async () => {
+    const service = buildService();
+    const controller = new LeisureItemsController(service);
+    const user = buildAuthenticatedUser();
+
+    const result = await controller.createCoverUploadUrl(user, { contentType: 'image/png' });
+
+    expect(service.createCoverUploadUrl).toHaveBeenCalledWith(user, { contentType: 'image/png' });
+    expect(result).toEqual({ path: 'user-1/cover.png', token: 'tok', signedUrl: 'https://upload' });
   });
 });

@@ -41,6 +41,9 @@ function buildRepository(overrides: Partial<LeisureItemsRepository> = {}): Leisu
     create: vi.fn().mockResolvedValue(buildItem()),
     update: vi.fn().mockResolvedValue(buildItem()),
     delete: vi.fn().mockResolvedValue(undefined),
+    createCoverUploadUrl: vi
+      .fn()
+      .mockResolvedValue({ path: 'user-1/cover.png', token: 'tok', signedUrl: 'https://upload' }),
     ...overrides,
   };
 }
@@ -242,5 +245,17 @@ describe('LeisureItemsService.reclassify', () => {
       type: 'book',
       details: { pages: 10 },
     });
+  });
+});
+
+describe('LeisureItemsService.createCoverUploadUrl', () => {
+  it('resolves the extension from contentType and delegates to the repository', async () => {
+    const repository = buildRepository();
+    const service = new LeisureItemsService(repository);
+    const user = buildAuthenticatedUser();
+
+    await service.createCoverUploadUrl(user, { contentType: 'image/webp' });
+
+    expect(repository.createCoverUploadUrl).toHaveBeenCalledWith(user.accessToken, user.id, 'webp');
   });
 });

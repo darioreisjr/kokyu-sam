@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  coverUploadUrlSchema,
   createLeisureItemSchema,
+  extensionForCoverMimeType,
   listLeisureItemsQuerySchema,
   reclassifyLeisureItemSchema,
   updateLeisureItemProgressSchema,
@@ -175,5 +177,25 @@ describe('reclassifyLeisureItemSchema', () => {
       details: { category: 'restaurant' },
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('coverUploadUrlSchema', () => {
+  it('accepts image/png, image/jpeg and image/webp', () => {
+    for (const contentType of ['image/png', 'image/jpeg', 'image/webp']) {
+      expect(coverUploadUrlSchema.safeParse({ contentType }).success).toBe(true);
+    }
+  });
+
+  it('rejects an unsupported content type', () => {
+    expect(coverUploadUrlSchema.safeParse({ contentType: 'application/pdf' }).success).toBe(false);
+  });
+});
+
+describe('extensionForCoverMimeType', () => {
+  it('maps each supported content type to its file extension', () => {
+    expect(extensionForCoverMimeType('image/png')).toBe('png');
+    expect(extensionForCoverMimeType('image/jpeg')).toBe('jpg');
+    expect(extensionForCoverMimeType('image/webp')).toBe('webp');
   });
 });

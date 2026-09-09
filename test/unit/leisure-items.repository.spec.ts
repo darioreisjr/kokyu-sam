@@ -249,3 +249,38 @@ describe('SupabaseLeisureItemsRepository.delete', () => {
     await expect(repository.delete('token', 'item-1')).rejects.toBeInstanceOf(Error);
   });
 });
+
+describe('SupabaseLeisureItemsRepository.createCoverUploadUrl', () => {
+  it('returns the signed upload target, scoped to the caller folder', async () => {
+    const createSignedUploadUrl = vi.fn(() =>
+      Promise.resolve({
+        data: { path: 'user-1/generated.png', token: 'tok', signedUrl: 'https://upload' },
+        error: null,
+      }),
+    );
+    const repository = buildRepository({
+      storage: { from: () => ({ createSignedUploadUrl }) },
+    });
+
+    const target = await repository.createCoverUploadUrl('token', 'user-1', 'png');
+
+    expect(target).toEqual({
+      path: 'user-1/generated.png',
+      token: 'tok',
+      signedUrl: 'https://upload',
+    });
+  });
+
+  it('throws InternalError when signing fails', async () => {
+    const createSignedUploadUrl = vi.fn(() =>
+      Promise.resolve({ data: null, error: { message: 'boom' } }),
+    );
+    const repository = buildRepository({
+      storage: { from: () => ({ createSignedUploadUrl }) },
+    });
+
+    await expect(repository.createCoverUploadUrl('token', 'user-1', 'png')).rejects.toBeInstanceOf(
+      Error,
+    );
+  });
+});
