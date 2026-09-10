@@ -48,6 +48,13 @@ export class LeisurePlanService {
     return expandPlanEntriesForRange(candidates, startDate, endDate, completedOccurrences);
   }
 
+  /** A single entry by id - the edit page's own fetch, independent of whatever range the planner list happened to have loaded. */
+  async findById(user: AuthenticatedUser, id: string): Promise<LeisurePlanEntry> {
+    const entry = await this.repository.findById(user.accessToken, id);
+    if (!entry) throw new LeisurePlanEntryNotFoundError();
+    return entry;
+  }
+
   // `async` (rather than a plain function returning `this.repository.create(...)`)
   // so the past-date check's throw surfaces as a rejected Promise, not a
   // synchronous throw — the same contract every other method here has.

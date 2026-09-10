@@ -234,6 +234,10 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect(listed.status).toBe(200);
     expect((listed.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(true);
 
+    const fetched = await auth(request(server()).get(`/api/v1/leisure/plan/${entry.id}`));
+    expect(fetched.status).toBe(200);
+    expect((fetched.body as PlanEntryBody).title).toBe('Assistir um filme');
+
     const rescheduled = await auth(
       request(server()).patch(`/api/v1/leisure/plan/${entry.id}`),
     ).send({ startTime: '21:00' });
@@ -257,6 +261,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
 
     const deleted = await auth(request(server()).delete(`/api/v1/leisure/plan/${entry.id}`));
     expect(deleted.status).toBe(204);
+
+    const afterDelete = await auth(request(server()).get(`/api/v1/leisure/plan/${entry.id}`));
+    expect(afterDelete.status).toBe(404);
   });
 
   it('daily plan entry: appears on every day from its anchor date, and completing one day never affects the others', async () => {

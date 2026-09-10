@@ -27,6 +27,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
 function buildService(overrides: Partial<Record<keyof LeisurePlanService, unknown>> = {}) {
   return {
     findByDateRange: vi.fn().mockResolvedValue([buildEntry()]),
+    findById: vi.fn().mockResolvedValue(buildEntry()),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -59,6 +60,17 @@ describe('LeisurePlanController', () => {
     await controller.create(user, body);
 
     expect(service.create).toHaveBeenCalledWith(user, body);
+  });
+
+  it('GET /:id delegates to LeisurePlanService.findById', async () => {
+    const service = buildService();
+    const controller = new LeisurePlanController(service);
+    const user = buildAuthenticatedUser();
+
+    const result = await controller.findById(user, { id: 'plan-1' });
+
+    expect(service.findById).toHaveBeenCalledWith(user, 'plan-1');
+    expect(result).toEqual(buildEntry());
   });
 
   it('PATCH /:id delegates to LeisurePlanService.update', async () => {

@@ -65,6 +65,16 @@ export class LeisurePlanController {
     return this.service.create(user, body);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Gets a single plan entry by id (e.g. to prefill the edit page).' })
+  @ApiOkResponse({ type: LeisurePlanEntryDto })
+  findById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(UuidParam)) params: { id: string },
+  ): Promise<LeisurePlanEntry> {
+    return this.service.findById(user, params.id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Updates a plan entry (e.g. reschedule).' })
   @ApiOkResponse({ type: LeisurePlanEntryDto })

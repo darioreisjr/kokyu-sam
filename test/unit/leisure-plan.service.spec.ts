@@ -149,6 +149,30 @@ describe('LeisurePlanService.findByDateRange', () => {
   });
 });
 
+describe('LeisurePlanService.findById', () => {
+  it('returns the entry from the repository', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ id: 'plan-1', title: 'Watch a movie' })),
+    });
+    const service = buildService(repository);
+    const user = buildAuthenticatedUser();
+
+    const result = await service.findById(user, 'plan-1');
+
+    expect(repository.findById).toHaveBeenCalledWith(user.accessToken, 'plan-1');
+    expect(result.title).toBe('Watch a movie');
+  });
+
+  it('throws LeisurePlanEntryNotFoundError when the repository returns null', async () => {
+    const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
+    const service = buildService(repository);
+
+    await expect(service.findById(buildAuthenticatedUser(), 'missing')).rejects.toBeInstanceOf(
+      LeisurePlanEntryNotFoundError,
+    );
+  });
+});
+
 describe('LeisurePlanService.create', () => {
   it('delegates to the repository with the caller id and access token', async () => {
     const repository = buildRepository();
