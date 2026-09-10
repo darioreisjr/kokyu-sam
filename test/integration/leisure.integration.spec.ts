@@ -213,18 +213,21 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
   it('plan entry lifecycle: create -> list by date range -> reschedule -> complete -> delete', async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
-    const today = new Date().toISOString().slice(0, 10);
+    // Tomorrow, not today: a fixed clock time like '20:00' would otherwise
+    // flake once the wall clock passes it (now that plan entries reject a
+    // past date/time — see `findPastPlanEntryViolation`).
+    const planDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const created = await auth(request(server()).post('/api/v1/leisure/plan')).send({
       title: 'Assistir um filme',
-      date: today,
+      date: planDate,
       startTime: '20:00',
     });
     expect(created.status).toBe(201);
     const entry = created.body as PlanEntryBody;
 
     const listed = await auth(
-      request(server()).get(`/api/v1/leisure/plan?startDate=${today}&endDate=${today}`),
+      request(server()).get(`/api/v1/leisure/plan?startDate=${planDate}&endDate=${planDate}`),
     );
     expect(listed.status).toBe(200);
     expect((listed.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(true);

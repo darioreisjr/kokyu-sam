@@ -126,6 +126,13 @@ export class LeisurePlanEntryNotFoundError extends AppError {
   }
 }
 
+/** Thrown when a plan entry's date/startTime/endTime is a new pick that lands in the past — see `findPastPlanEntryViolation`. */
+export class LeisurePlanEntryDateInvalidError extends AppError {
+  constructor(message = 'Plan entry date/time cannot be in the past.') {
+    super(ErrorCode.LEISURE_PLAN_ENTRY_DATE_INVALID, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
 export class LeisureNoteNotFoundError extends AppError {
   constructor(message = 'Leisure note not found.') {
     super(ErrorCode.LEISURE_NOTE_NOT_FOUND, HttpStatus.NOT_FOUND, message);

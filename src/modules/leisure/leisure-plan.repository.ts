@@ -34,6 +34,19 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
     return (data ?? []).map((row) => this.toDomain(row));
   }
 
+  async findById(accessToken: string, id: string): Promise<LeisurePlanEntry | null> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    const { data, error } = await client
+      .from('leisure_plan_entries')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw mapSupabaseError(error);
+
+    return data ? this.toDomain(data) : null;
+  }
+
   async create(
     accessToken: string,
     userId: string,

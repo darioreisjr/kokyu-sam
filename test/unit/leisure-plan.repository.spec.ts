@@ -91,6 +91,42 @@ describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
   });
 });
 
+describe('SupabaseLeisurePlanRepository.findById', () => {
+  it('returns the mapped entry when found', async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: buildPlanRow(), error: null }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from });
+
+    const entry = await repository.findById('token', 'plan-1');
+
+    expect(from).toHaveBeenCalledWith('leisure_plan_entries');
+    expect(eq).toHaveBeenCalledWith('id', 'plan-1');
+    expect(entry).toEqual(buildExpectedEntry());
+  });
+
+  it('returns null when no row matches', async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.findById('token', 'missing')).resolves.toBeNull();
+  });
+
+  it('throws a mapped error when the query fails', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.findById('token', 'plan-1')).rejects.toBeInstanceOf(Error);
+  });
+});
+
 describe('SupabaseLeisurePlanRepository.create', () => {
   it('inserts with defaults applied and maps the returned row', async () => {
     const single = vi.fn(() => Promise.resolve({ data: buildPlanRow(), error: null }));

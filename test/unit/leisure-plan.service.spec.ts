@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LeisurePlanEntryNotFoundError } from '../../src/common/errors/app.error';
+import {
+  LeisurePlanEntryDateInvalidError,
+  LeisurePlanEntryNotFoundError,
+} from '../../src/common/errors/app.error';
 import { LeisurePlanService } from '../../src/modules/leisure/leisure-plan.service';
 import { LeisurePlanRepository } from '../../src/modules/leisure/types/leisure-plan-repository.interface';
 import { LeisurePlanEntry } from '../../src/modules/leisure/types/leisure-plan-entry.type';
@@ -27,6 +30,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
 function buildRepository(overrides: Partial<LeisurePlanRepository> = {}): LeisurePlanRepository {
   return {
     findByDateRange: vi.fn().mockResolvedValue([buildEntry()]),
+    findById: vi.fn().mockResolvedValue(buildEntry()),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -55,11 +59,23 @@ describe('LeisurePlanService.create', () => {
     const repository = buildRepository();
     const service = new LeisurePlanService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
-    const input = { title: 'Watch a movie', date: '2026-01-01' };
+    // Far enough in the future to never become "today"/past for this test's lifetime.
+    const input = { title: 'Watch a movie', date: '2099-01-01' };
 
     await service.create(user, input);
 
     expect(repository.create).toHaveBeenCalledWith(user.accessToken, 'user-1', input);
+  });
+
+  it('rejects a date in the past without touching the repository', async () => {
+    const repository = buildRepository();
+    const service = new LeisurePlanService(repository);
+    const input = { title: 'Watch a movie', date: '2000-01-01' };
+
+    await expect(service.create(buildAuthenticatedUser(), input)).rejects.toBeInstanceOf(
+      LeisurePlanEntryDateInvalidError,
+    );
+    expect(repository.create).not.toHaveBeenCalled();
   });
 });
 
@@ -81,6 +97,53 @@ describe('LeisurePlanService.update', () => {
 
     await expect(
       service.update(buildAuthenticatedUser(), 'missing', { title: 'x' }),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryNotFoundError);
+  });
+
+  it('does not look up the existing entry when the patch never touches date/startTime/endTime', async () => {
+    const repository = buildRepository();
+    const service = new LeisurePlanService(repository);
+
+    await service.update(buildAuthenticatedUser(), 'plan-1', { title: 'Renamed' });
+
+    expect(repository.findById).not.toHaveBeenCalled();
+  });
+
+  it('allows keeping an already-past date unchanged (e.g. editing just the notes)', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ date: '2000-01-01' })),
+    });
+    const service = new LeisurePlanService(repository);
+
+    await service.update(buildAuthenticatedUser(), 'plan-1', {
+      date: '2000-01-01',
+      notes: 'Updated notes',
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(expect.any(String), 'plan-1', {
+      date: '2000-01-01',
+      notes: 'Updated notes',
+    });
+  });
+
+  it('rejects rescheduling an entry to a new past date', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ date: '2099-01-01' })),
+    });
+    const service = new LeisurePlanService(repository);
+
+    await expect(
+      service.update(buildAuthenticatedUser(), 'plan-1', { date: '2000-01-01' }),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryDateInvalidError);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('throws LeisurePlanEntryNotFoundError when the entry to reschedule does not exist', async () => {
+    const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
+    const service = new LeisurePlanService(repository);
+
+    await expect(
+      service.update(buildAuthenticatedUser(), 'missing', { date: '2099-01-01' }),
     ).rejects.toBeInstanceOf(LeisurePlanEntryNotFoundError);
   });
 });

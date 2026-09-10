@@ -12,6 +12,7 @@ export interface LeisurePlanRepository {
     startDate: string,
     endDate: string,
   ) => Promise<LeisurePlanEntry[]>;
+  findById: (accessToken: string, id: string) => Promise<LeisurePlanEntry | null>;
   create: (
     accessToken: string,
     userId: string,
