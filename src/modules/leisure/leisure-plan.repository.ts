@@ -3,6 +3,7 @@ import { mapSupabaseError } from '../../common/errors/supabase-error.mapper';
 import { SupabaseClientFactoryService } from '../../infrastructure/supabase/supabase-client.factory.service';
 import { Database } from '../../infrastructure/supabase/database.types';
 import { LeisureRecurrence } from './constants/leisure-enums.constant';
+import { occurrenceCompletionKey } from './leisure-plan-recurrence.util';
 import {
   LeisurePlanEntry,
   LeisurePlanEntryCreateInput,
@@ -23,15 +24,55 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
   ): Promise<LeisurePlanEntry[]> {
     const client = this.supabase.getUserScopedClient(accessToken);
 
+    // Candidates for [startDate, endDate], not the final answer: a
+    // recurring row anchored *before* startDate can still recur into the
+    // range, so it's kept even though its own `date` is outside
+    // [startDate, endDate]. The caller (LeisurePlanService) expands these
+    // into actual occurrences via `expandPlanEntriesForRange`.
     const { data, error } = await client
       .from('leisure_plan_entries')
       .select('*')
-      .gte('date', startDate)
       .lte('date', endDate)
+      .or(`recurrence.neq.none,date.gte.${startDate}`)
       .order('date', { ascending: true });
     if (error) throw mapSupabaseError(error);
 
     return (data ?? []).map((row) => this.toDomain(row));
+  }
+
+  async findCompletedOccurrences(
+    accessToken: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<Set<string>> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    const { data, error } = await client
+      .from('leisure_plan_entry_completions')
+      .select('plan_entry_id, occurrence_date')
+      .gte('occurrence_date', startDate)
+      .lte('occurrence_date', endDate);
+    if (error) throw mapSupabaseError(error);
+
+    return new Set(
+      (data ?? []).map((row) => occurrenceCompletionKey(row.plan_entry_id, row.occurrence_date)),
+    );
+  }
+
+  async markOccurrenceCompleted(
+    accessToken: string,
+    userId: string,
+    planEntryId: string,
+    occurrenceDate: string,
+  ): Promise<void> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    const { error } = await client.from('leisure_plan_entry_completions').upsert(
+      { user_id: userId, plan_entry_id: planEntryId, occurrence_date: occurrenceDate },
+      // Completing the same day twice is a no-op, not a conflict error.
+      { onConflict: 'plan_entry_id,occurrence_date', ignoreDuplicates: true },
+    );
+    if (error) throw mapSupabaseError(error);
   }
 
   async findById(accessToken: string, id: string): Promise<LeisurePlanEntry | null> {
@@ -122,6 +163,9 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
       leisureItemId: row.leisure_item_id,
       title: row.title,
       date: row.date,
+      // Overridden by `expandPlanEntriesForRange` when this row produces
+      // more than one occurrence within a requested range.
+      occurrenceDate: row.date,
       startTime: row.start_time,
       endTime: row.end_time,
       duration: row.duration,

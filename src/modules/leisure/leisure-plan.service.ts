@@ -5,6 +5,7 @@ import {
   LeisurePlanEntryNotFoundError,
 } from '../../common/errors/app.error';
 import { findPastPlanEntryViolation } from './leisure-plan-date.util';
+import { expandPlanEntriesForRange } from './leisure-plan-recurrence.util';
 import {
   LeisurePlanEntry,
   LeisurePlanEntryCreateInput,
@@ -22,12 +23,17 @@ export class LeisurePlanService {
     private readonly repository: LeisurePlanRepository,
   ) {}
 
-  findByDateRange(
+  async findByDateRange(
     user: AuthenticatedUser,
     startDate: string,
     endDate: string,
   ): Promise<LeisurePlanEntry[]> {
-    return this.repository.findByDateRange(user.accessToken, startDate, endDate);
+    const [candidates, completedOccurrences] = await Promise.all([
+      this.repository.findByDateRange(user.accessToken, startDate, endDate),
+      this.repository.findCompletedOccurrences(user.accessToken, startDate, endDate),
+    ]);
+
+    return expandPlanEntriesForRange(candidates, startDate, endDate, completedOccurrences);
   }
 
   // `async` (rather than a plain function returning `this.repository.create(...)`)
@@ -69,7 +75,28 @@ export class LeisurePlanService {
     await this.repository.delete(user.accessToken, id);
   }
 
-  complete(user: AuthenticatedUser, id: string): Promise<LeisurePlanEntry> {
+  /**
+   * `occurrenceDate` picks which day of a `'daily'`/`'weekly'` series is
+   * being completed (defaults to the series' own anchor date) - recorded
+   * in `leisure_plan_entry_completions` so it never affects any other
+   * day. A `'none'`/`'custom'` entry has only ever had one day, so it
+   * keeps going through `update()`'s `completed` column exactly as
+   * before.
+   */
+  async complete(
+    user: AuthenticatedUser,
+    id: string,
+    occurrenceDate?: string,
+  ): Promise<LeisurePlanEntry> {
+    const existing = await this.repository.findById(user.accessToken, id);
+    if (!existing) throw new LeisurePlanEntryNotFoundError();
+
+    if (existing.recurrence === 'daily' || existing.recurrence === 'weekly') {
+      const date = occurrenceDate ?? existing.date;
+      await this.repository.markOccurrenceCompleted(user.accessToken, user.id, id, date);
+      return { ...existing, occurrenceDate: date, completed: true };
+    }
+
     return this.update(user, id, { completed: true });
   }
 }

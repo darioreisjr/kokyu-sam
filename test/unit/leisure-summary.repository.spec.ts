@@ -9,26 +9,19 @@ function buildRepository(client: unknown): SupabaseLeisureSummaryRepository {
 }
 
 /**
- * Builds a client whose `from()` dispatches per table: `leisure_plan_entries`
- * for the "next planned entry today" query and `leisure_items` for both the
- * "in progress" query and the backlog head-count query (three total calls
- * driven by Promise.all).
+ * Builds a client whose `from('leisure_items')` dispatches per call: the
+ * first call is the "in progress" query, the second the backlog
+ * head-count query (two total calls driven by Promise.all).
+ * `plannedToday` is no longer computed here - see
+ * `LeisureSummaryService`, which derives it from
+ * `LeisurePlanService.findByDateRange` instead.
  */
 function buildClient(options: {
-  planned?: { data: unknown; error: unknown };
   inProgress?: { data: unknown; error: unknown };
   backlog?: { count: number | null; error: unknown };
 }) {
-  const planned = options.planned ?? { data: null, error: null };
   const inProgress = options.inProgress ?? { data: null, error: null };
   const backlog = options.backlog ?? { count: 0, error: null };
-
-  const plannedMaybeSingle = vi.fn(() => Promise.resolve(planned));
-  const plannedLimit = vi.fn(() => ({ maybeSingle: plannedMaybeSingle }));
-  const plannedOrder = vi.fn(() => ({ limit: plannedLimit }));
-  const plannedEqCompleted = vi.fn(() => ({ order: plannedOrder }));
-  const plannedEqDate = vi.fn(() => ({ eq: plannedEqCompleted }));
-  const plannedSelect = vi.fn(() => ({ eq: plannedEqDate }));
 
   const inProgressMaybeSingle = vi.fn(() => Promise.resolve(inProgress));
   const inProgressLimit = vi.fn(() => ({ maybeSingle: inProgressMaybeSingle }));
@@ -38,10 +31,7 @@ function buildClient(options: {
   const backlogEq = vi.fn(() => Promise.resolve(backlog));
 
   let itemsCallCount = 0;
-  const from = vi.fn((table: string) => {
-    if (table === 'leisure_plan_entries') {
-      return { select: plannedSelect };
-    }
+  const from = vi.fn(() => {
     itemsCallCount += 1;
     if (itemsCallCount === 1) {
       return { select: vi.fn(() => ({ eq: inProgressEq })) };
@@ -49,22 +39,12 @@ function buildClient(options: {
     return { select: vi.fn(() => ({ eq: backlogEq })) };
   });
 
-  return { from, plannedEqDate, plannedEqCompleted, inProgressEq, backlogEq };
+  return { from, inProgressEq, backlogEq };
 }
 
 describe('SupabaseLeisureSummaryRepository.getSummary', () => {
-  it('runs all three queries and assembles the summary when everything is present', async () => {
-    const { from, plannedEqDate } = buildClient({
-      planned: {
-        data: {
-          id: 'plan-1',
-          title: 'Watch a movie',
-          start_time: '19:00',
-          leisure_item_id: 'item-1',
-          leisure_items: { type: 'movie' },
-        },
-        error: null,
-      },
+  it('runs both queries and assembles the base summary when everything is present', async () => {
+    const { from } = buildClient({
       inProgress: {
         data: { id: 'item-2', title: 'The Odyssey', type: 'book' },
         error: null,
@@ -73,59 +53,23 @@ describe('SupabaseLeisureSummaryRepository.getSummary', () => {
     });
     const repository = buildRepository({ from });
 
-    const summary = await repository.getSummary('token', '2026-01-01');
+    const summary = await repository.getSummary('token');
 
-    expect(plannedEqDate).toHaveBeenCalledWith('date', '2026-01-01');
+    expect(from).toHaveBeenCalledWith('leisure_items');
     expect(summary).toEqual({
-      plannedToday: { id: 'plan-1', title: 'Watch a movie', type: 'movie', startTime: '19:00' },
       inProgress: { id: 'item-2', title: 'The Odyssey', type: 'book' },
       backlogCount: 4,
     });
   });
 
-  it('falls back to "custom" type when the planned entry has no linked leisure item', async () => {
-    const { from } = buildClient({
-      planned: {
-        data: {
-          id: 'plan-1',
-          title: 'Custom activity',
-          start_time: null,
-          leisure_item_id: null,
-          leisure_items: null,
-        },
-        error: null,
-      },
-    });
-    const repository = buildRepository({ from });
-
-    const summary = await repository.getSummary('token', '2026-01-01');
-
-    expect(summary.plannedToday).toEqual({
-      id: 'plan-1',
-      title: 'Custom activity',
-      type: 'custom',
-      startTime: null,
-    });
-  });
-
-  it('returns null plannedToday/inProgress and zero backlogCount when nothing is found', async () => {
+  it('returns null inProgress and zero backlogCount when nothing is found', async () => {
     const { from } = buildClient({ backlog: { count: null, error: null } });
     const repository = buildRepository({ from });
 
-    await expect(repository.getSummary('token', '2026-01-01')).resolves.toEqual({
-      plannedToday: null,
+    await expect(repository.getSummary('token')).resolves.toEqual({
       inProgress: null,
       backlogCount: 0,
     });
-  });
-
-  it('throws a mapped error when the planned-entry query fails', async () => {
-    const { from } = buildClient({
-      planned: { data: null, error: { code: 'XX000', message: 'boom' } },
-    });
-    const repository = buildRepository({ from });
-
-    await expect(repository.getSummary('token', '2026-01-01')).rejects.toBeInstanceOf(Error);
   });
 
   it('throws a mapped error when the in-progress query fails', async () => {
@@ -134,7 +78,7 @@ describe('SupabaseLeisureSummaryRepository.getSummary', () => {
     });
     const repository = buildRepository({ from });
 
-    await expect(repository.getSummary('token', '2026-01-01')).rejects.toBeInstanceOf(Error);
+    await expect(repository.getSummary('token')).rejects.toBeInstanceOf(Error);
   });
 
   it('throws a mapped error when the backlog head-count query fails', async () => {
@@ -143,6 +87,42 @@ describe('SupabaseLeisureSummaryRepository.getSummary', () => {
     });
     const repository = buildRepository({ from });
 
-    await expect(repository.getSummary('token', '2026-01-01')).rejects.toBeInstanceOf(Error);
+    await expect(repository.getSummary('token')).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe('SupabaseLeisureSummaryRepository.getItemType', () => {
+  it("returns the item's type", async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: { type: 'movie' }, error: null }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from });
+
+    const type = await repository.getItemType('token', 'item-1');
+
+    expect(from).toHaveBeenCalledWith('leisure_items');
+    expect(eq).toHaveBeenCalledWith('id', 'item-1');
+    expect(type).toBe('movie');
+  });
+
+  it('returns null when the item does not exist', async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.getItemType('token', 'missing')).resolves.toBeNull();
+  });
+
+  it('throws a mapped error when the query fails', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.getItemType('token', 'item-1')).rejects.toBeInstanceOf(Error);
   });
 });

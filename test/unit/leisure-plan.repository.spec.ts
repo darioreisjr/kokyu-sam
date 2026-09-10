@@ -28,6 +28,7 @@ function buildExpectedEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisureP
     leisureItemId: null,
     title: 'Watch a movie',
     date: '2026-01-01',
+    occurrenceDate: '2026-01-01',
     startTime: '19:00',
     endTime: null,
     duration: 120,
@@ -48,27 +49,27 @@ function buildRepository(client: unknown): SupabaseLeisurePlanRepository {
 }
 
 describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
-  it('queries within an inclusive date range ordered ascending', async () => {
+  it('queries candidates up to endDate, recurring or anchored on/after startDate, ordered ascending', async () => {
     const order = vi.fn(() => Promise.resolve({ data: [buildPlanRow()], error: null }));
-    const lte = vi.fn(() => ({ order }));
-    const gte = vi.fn(() => ({ lte }));
-    const select = vi.fn(() => ({ gte }));
+    const or = vi.fn(() => ({ order }));
+    const lte = vi.fn(() => ({ or }));
+    const select = vi.fn(() => ({ lte }));
     const from = vi.fn(() => ({ select }));
     const repository = buildRepository({ from });
 
     const entries = await repository.findByDateRange('token', '2026-01-01', '2026-01-31');
 
     expect(from).toHaveBeenCalledWith('leisure_plan_entries');
-    expect(gte).toHaveBeenCalledWith('date', '2026-01-01');
     expect(lte).toHaveBeenCalledWith('date', '2026-01-31');
+    expect(or).toHaveBeenCalledWith('recurrence.neq.none,date.gte.2026-01-01');
     expect(entries).toEqual([buildExpectedEntry()]);
   });
 
   it('returns an empty array when data is null', async () => {
     const order = vi.fn(() => Promise.resolve({ data: null, error: null }));
-    const lte = vi.fn(() => ({ order }));
-    const gte = vi.fn(() => ({ lte }));
-    const select = vi.fn(() => ({ gte }));
+    const or = vi.fn(() => ({ order }));
+    const lte = vi.fn(() => ({ or }));
+    const select = vi.fn(() => ({ lte }));
     const repository = buildRepository({ from: () => ({ select }) });
 
     await expect(repository.findByDateRange('token', '2026-01-01', '2026-01-31')).resolves.toEqual(
@@ -80,13 +81,85 @@ describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
     const order = vi.fn(() =>
       Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
     );
-    const lte = vi.fn(() => ({ order }));
+    const or = vi.fn(() => ({ order }));
+    const lte = vi.fn(() => ({ or }));
+    const select = vi.fn(() => ({ lte }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(
+      repository.findByDateRange('token', '2026-01-01', '2026-01-31'),
+    ).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe('SupabaseLeisurePlanRepository.findCompletedOccurrences', () => {
+  it('returns a set of "planEntryId|occurrenceDate" keys within the range', async () => {
+    const lte = vi.fn(() =>
+      Promise.resolve({
+        data: [
+          { plan_entry_id: 'plan-1', occurrence_date: '2026-01-05' },
+          { plan_entry_id: 'plan-1', occurrence_date: '2026-01-06' },
+        ],
+        error: null,
+      }),
+    );
+    const gte = vi.fn(() => ({ lte }));
+    const select = vi.fn(() => ({ gte }));
+    const from = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from });
+
+    const result = await repository.findCompletedOccurrences('token', '2026-01-01', '2026-01-31');
+
+    expect(from).toHaveBeenCalledWith('leisure_plan_entry_completions');
+    expect(gte).toHaveBeenCalledWith('occurrence_date', '2026-01-01');
+    expect(lte).toHaveBeenCalledWith('occurrence_date', '2026-01-31');
+    expect(result).toEqual(new Set(['plan-1|2026-01-05', 'plan-1|2026-01-06']));
+  });
+
+  it('returns an empty set when data is null', async () => {
+    const lte = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const gte = vi.fn(() => ({ lte }));
+    const select = vi.fn(() => ({ gte }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    const result = await repository.findCompletedOccurrences('token', '2026-01-01', '2026-01-31');
+
+    expect(result).toEqual(new Set());
+  });
+
+  it('throws a mapped error when the query fails', async () => {
+    const lte = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
     const gte = vi.fn(() => ({ lte }));
     const select = vi.fn(() => ({ gte }));
     const repository = buildRepository({ from: () => ({ select }) });
 
     await expect(
-      repository.findByDateRange('token', '2026-01-01', '2026-01-31'),
+      repository.findCompletedOccurrences('token', '2026-01-01', '2026-01-31'),
+    ).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe('SupabaseLeisurePlanRepository.markOccurrenceCompleted', () => {
+  it('upserts a completion, ignoring duplicates', async () => {
+    const upsert = vi.fn(() => Promise.resolve({ error: null }));
+    const repository = buildRepository({ from: () => ({ upsert }) });
+
+    await repository.markOccurrenceCompleted('token', 'user-1', 'plan-1', '2026-01-05');
+
+    expect(upsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', plan_entry_id: 'plan-1', occurrence_date: '2026-01-05' },
+      { onConflict: 'plan_entry_id,occurrence_date', ignoreDuplicates: true },
+    );
+  });
+
+  it('throws a mapped error when the upsert fails', async () => {
+    const upsert = vi.fn(() => Promise.resolve({ error: { code: 'XX000', message: 'boom' } }));
+    const repository = buildRepository({ from: () => ({ upsert }) });
+
+    await expect(
+      repository.markOccurrenceCompleted('token', 'user-1', 'plan-1', '2026-01-05'),
     ).rejects.toBeInstanceOf(Error);
   });
 });

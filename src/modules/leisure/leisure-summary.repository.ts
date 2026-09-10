@@ -1,25 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { mapSupabaseError } from '../../common/errors/supabase-error.mapper';
 import { SupabaseClientFactoryService } from '../../infrastructure/supabase/supabase-client.factory.service';
-import { LeisureSummary } from './types/leisure-summary.type';
+import { LeisureSummaryBase } from './types/leisure-summary.type';
 import { LeisureSummaryRepository } from './types/leisure-summary-repository.interface';
 
 @Injectable()
 export class SupabaseLeisureSummaryRepository implements LeisureSummaryRepository {
   constructor(private readonly supabase: SupabaseClientFactoryService) {}
 
-  async getSummary(accessToken: string, date: string): Promise<LeisureSummary> {
+  // `plannedToday` isn't computed here - see `LeisureSummaryRepository`'s
+  // doc comment - so neither of these two remaining queries needs a date.
+  async getSummary(accessToken: string): Promise<LeisureSummaryBase> {
     const client = this.supabase.getUserScopedClient(accessToken);
 
-    const [plannedResult, inProgressResult, backlogResult] = await Promise.all([
-      client
-        .from('leisure_plan_entries')
-        .select('id, title, start_time, leisure_item_id, leisure_items(type)')
-        .eq('date', date)
-        .eq('completed', false)
-        .order('start_time', { ascending: true, nullsFirst: false })
-        .limit(1)
-        .maybeSingle(),
+    const [inProgressResult, backlogResult] = await Promise.all([
       client
         .from('leisure_items')
         .select('id, title, type')
@@ -33,26 +27,29 @@ export class SupabaseLeisureSummaryRepository implements LeisureSummaryRepositor
         .eq('type', 'unsorted'),
     ]);
 
-    if (plannedResult.error) throw mapSupabaseError(plannedResult.error);
     if (inProgressResult.error) throw mapSupabaseError(inProgressResult.error);
     if (backlogResult.error) throw mapSupabaseError(backlogResult.error);
 
-    const planned = plannedResult.data;
     const inProgress = inProgressResult.data;
 
     return {
-      plannedToday: planned
-        ? {
-            id: planned.id,
-            title: planned.title,
-            type: planned.leisure_items?.type ?? 'custom',
-            startTime: planned.start_time,
-          }
-        : null,
       inProgress: inProgress
         ? { id: inProgress.id, title: inProgress.title, type: inProgress.type }
         : null,
       backlogCount: backlogResult.count ?? 0,
     };
+  }
+
+  async getItemType(accessToken: string, itemId: string): Promise<string | null> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    const { data, error } = await client
+      .from('leisure_items')
+      .select('type')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (error) throw mapSupabaseError(error);
+
+    return data?.type ?? null;
   }
 }

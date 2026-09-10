@@ -40,6 +40,20 @@ export const listPlanQuerySchema = z
     path: ['endDate'],
   });
 
+/**
+ * `date` picks which occurrence of a `'daily'`/`'weekly'` entry is being
+ * completed (defaults to the entry's own anchor date when omitted) -
+ * irrelevant for `'none'`/`'custom'`, which have only ever had one.
+ * `.default({})` because this body is entirely optional - a `'none'`
+ * entry's complete call, exactly as before this feature, sends none at
+ * all.
+ */
+export const completePlanEntrySchema = z
+  .object({ date: dateSchema.optional() })
+  .strict()
+  .default({});
+
 export type CreatePlanEntryBody = z.infer<typeof createPlanEntrySchema>;
 export type UpdatePlanEntryBody = z.infer<typeof updatePlanEntrySchema>;
 export type ListPlanQuery = z.infer<typeof listPlanQuerySchema>;
+export type CompletePlanEntryBody = z.infer<typeof completePlanEntrySchema>;

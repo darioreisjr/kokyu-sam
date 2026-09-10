@@ -13,6 +13,24 @@ export interface LeisurePlanRepository {
     endDate: string,
   ) => Promise<LeisurePlanEntry[]>;
   findById: (accessToken: string, id: string) => Promise<LeisurePlanEntry | null>;
+  /**
+   * Which `${planEntryId}|${occurrenceDate}` keys (see
+   * `occurrenceCompletionKey`) have a recorded completion within
+   * `[startDate, endDate]` - the per-day completion state for
+   * `recurrence: 'daily'`/`'weekly'` entries in that range.
+   */
+  findCompletedOccurrences: (
+    accessToken: string,
+    startDate: string,
+    endDate: string,
+  ) => Promise<Set<string>>;
+  /** Records that `occurrenceDate` of `planEntryId`'s series was completed. Idempotent - completing the same day twice is a no-op. */
+  markOccurrenceCompleted: (
+    accessToken: string,
+    userId: string,
+    planEntryId: string,
+    occurrenceDate: string,
+  ) => Promise<void>;
   create: (
     accessToken: string,
     userId: string,

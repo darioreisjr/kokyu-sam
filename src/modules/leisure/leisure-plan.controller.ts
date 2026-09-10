@@ -24,9 +24,11 @@ import { ZodValidationPipe } from '../../common/utils/zod-validation.pipe';
 import { LeisurePlanService } from './leisure-plan.service';
 import { LeisurePlanEntryDto } from './schemas/leisure-plan.dto';
 import {
+  CompletePlanEntryBody,
   CreatePlanEntryBody,
   ListPlanQuery,
   UpdatePlanEntryBody,
+  completePlanEntrySchema,
   createPlanEntrySchema,
   listPlanQuerySchema,
   updatePlanEntrySchema,
@@ -85,12 +87,16 @@ export class LeisurePlanController {
   }
 
   @Post(':id/complete')
-  @ApiOperation({ summary: 'Marks a plan entry as completed.' })
+  @ApiOperation({
+    summary:
+      "Marks a plan entry as completed. For a daily/weekly entry, `date` picks which occurrence (defaults to the entry's own anchor date) - every other occurrence is unaffected.",
+  })
   @ApiOkResponse({ type: LeisurePlanEntryDto })
   complete(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(UuidParam)) params: { id: string },
+    @Body(new ZodValidationPipe(completePlanEntrySchema)) body: CompletePlanEntryBody,
   ): Promise<LeisurePlanEntry> {
-    return this.service.complete(user, params.id);
+    return this.service.complete(user, params.id, body.date);
   }
 }

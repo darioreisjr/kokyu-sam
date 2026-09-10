@@ -325,6 +325,38 @@ export type Database = {
           },
         ];
       };
+      leisure_plan_entry_completions: {
+        Row: {
+          completed_at: string;
+          id: string;
+          occurrence_date: string;
+          plan_entry_id: string;
+          user_id: string;
+        };
+        Insert: {
+          completed_at?: string;
+          id?: string;
+          occurrence_date: string;
+          plan_entry_id: string;
+          user_id: string;
+        };
+        Update: {
+          completed_at?: string;
+          id?: string;
+          occurrence_date?: string;
+          plan_entry_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'leisure_plan_entry_completions_plan_entry_id_fkey';
+            columns: ['plan_entry_id'];
+            isOneToOne: false;
+            referencedRelation: 'leisure_plan_entries';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       profiles: {
         Row: {
           avatar_external_url: string | null;

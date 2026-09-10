@@ -11,6 +11,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     leisureItemId: null,
     title: 'Watch a movie',
     date: '2026-01-01',
+    occurrenceDate: '2026-01-01',
     startTime: '19:00',
     endTime: null,
     duration: 120,
@@ -86,9 +87,19 @@ describe('LeisurePlanController', () => {
     const controller = new LeisurePlanController(service);
     const user = buildAuthenticatedUser();
 
-    const result = await controller.complete(user, { id: 'plan-1' });
+    const result = await controller.complete(user, { id: 'plan-1' }, {});
 
-    expect(service.complete).toHaveBeenCalledWith(user, 'plan-1');
+    expect(service.complete).toHaveBeenCalledWith(user, 'plan-1', undefined);
     expect(result.completed).toBe(true);
+  });
+
+  it('POST /:id/complete forwards the occurrence date for a recurring entry', async () => {
+    const service = buildService();
+    const controller = new LeisurePlanController(service);
+    const user = buildAuthenticatedUser();
+
+    await controller.complete(user, { id: 'plan-1' }, { date: '2026-03-05' });
+
+    expect(service.complete).toHaveBeenCalledWith(user, 'plan-1', '2026-03-05');
   });
 });

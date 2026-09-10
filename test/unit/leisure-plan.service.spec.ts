@@ -15,6 +15,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     leisureItemId: null,
     title: 'Watch a movie',
     date: '2026-01-01',
+    occurrenceDate: '2026-01-01',
     startTime: '19:00',
     endTime: null,
     duration: 120,
@@ -31,6 +32,8 @@ function buildRepository(overrides: Partial<LeisurePlanRepository> = {}): Leisur
   return {
     findByDateRange: vi.fn().mockResolvedValue([buildEntry()]),
     findById: vi.fn().mockResolvedValue(buildEntry()),
+    findCompletedOccurrences: vi.fn().mockResolvedValue(new Set()),
+    markOccurrenceCompleted: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -39,18 +42,49 @@ function buildRepository(overrides: Partial<LeisurePlanRepository> = {}): Leisur
 }
 
 describe('LeisurePlanService.findByDateRange', () => {
-  it('delegates to the repository', async () => {
-    const repository = buildRepository();
+  it('fetches candidates and completions, then expands them into occurrences', async () => {
+    const repository = buildRepository({
+      findByDateRange: vi.fn().mockResolvedValue([buildEntry({ recurrence: 'daily' })]),
+      findCompletedOccurrences: vi.fn().mockResolvedValue(new Set(['plan-1|2026-01-02'])),
+    });
     const service = new LeisurePlanService(repository);
     const user = buildAuthenticatedUser();
 
-    await service.findByDateRange(user, '2026-01-01', '2026-01-31');
+    const result = await service.findByDateRange(user, '2026-01-01', '2026-01-03');
 
     expect(repository.findByDateRange).toHaveBeenCalledWith(
       user.accessToken,
       '2026-01-01',
-      '2026-01-31',
+      '2026-01-03',
     );
+    expect(repository.findCompletedOccurrences).toHaveBeenCalledWith(
+      user.accessToken,
+      '2026-01-01',
+      '2026-01-03',
+    );
+    // One daily entry expands into 3 occurrences over the 3-day range,
+    // with only the completed one (2026-01-02) reflecting `completed: true`.
+    expect(result.map((entry) => [entry.occurrenceDate, entry.completed])).toEqual([
+      ['2026-01-01', false],
+      ['2026-01-02', true],
+      ['2026-01-03', false],
+    ]);
+  });
+
+  it('leaves a non-recurring entry as a single occurrence', async () => {
+    const repository = buildRepository({
+      findByDateRange: vi.fn().mockResolvedValue([buildEntry({ date: '2026-01-02' })]),
+    });
+    const service = new LeisurePlanService(repository);
+
+    const result = await service.findByDateRange(
+      buildAuthenticatedUser(),
+      '2026-01-01',
+      '2026-01-03',
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.occurrenceDate).toBe('2026-01-02');
   });
 });
 
@@ -161,8 +195,10 @@ describe('LeisurePlanService.delete', () => {
 });
 
 describe('LeisurePlanService.complete', () => {
-  it('patches completed to true', async () => {
-    const repository = buildRepository();
+  it('patches completed to true for a non-recurring entry', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none' })),
+    });
     const service = new LeisurePlanService(repository);
     const user = buildAuthenticatedUser();
 
@@ -171,14 +207,54 @@ describe('LeisurePlanService.complete', () => {
     expect(repository.update).toHaveBeenCalledWith(user.accessToken, 'plan-1', {
       completed: true,
     });
+    expect(repository.markOccurrenceCompleted).not.toHaveBeenCalled();
   });
 
   it('throws LeisurePlanEntryNotFoundError when the entry does not exist', async () => {
-    const repository = buildRepository({ update: vi.fn().mockResolvedValue(null) });
+    const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
     const service = new LeisurePlanService(repository);
 
     await expect(service.complete(buildAuthenticatedUser(), 'missing')).rejects.toBeInstanceOf(
       LeisurePlanEntryNotFoundError,
     );
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('records a per-occurrence completion for a daily entry, defaulting to its own anchor date', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+    });
+    const service = new LeisurePlanService(repository);
+    const user = buildAuthenticatedUser({ id: 'user-1' });
+
+    const result = await service.complete(user, 'plan-1');
+
+    expect(repository.markOccurrenceCompleted).toHaveBeenCalledWith(
+      user.accessToken,
+      'user-1',
+      'plan-1',
+      '2026-01-01',
+    );
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(result.occurrenceDate).toBe('2026-01-01');
+    expect(result.completed).toBe(true);
+  });
+
+  it('records a per-occurrence completion for the given date, leaving other occurrences untouched', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'weekly', date: '2026-01-01' })),
+    });
+    const service = new LeisurePlanService(repository);
+    const user = buildAuthenticatedUser({ id: 'user-1' });
+
+    const result = await service.complete(user, 'plan-1', '2026-01-15');
+
+    expect(repository.markOccurrenceCompleted).toHaveBeenCalledWith(
+      user.accessToken,
+      'user-1',
+      'plan-1',
+      '2026-01-15',
+    );
+    expect(result.occurrenceDate).toBe('2026-01-15');
   });
 });

@@ -16,3 +16,12 @@ export interface LeisureSummary {
   inProgress: LeisureHomeItemRef | null;
   backlogCount: number;
 }
+
+/**
+ * What `LeisureSummaryRepository.getSummary` still computes directly -
+ * `plannedToday` moved to `LeisureSummaryService`, which derives it from
+ * `LeisurePlanService.findByDateRange` instead (recurrence-aware: a
+ * daily/weekly plan entry anchored on an earlier date still counts as
+ * "planned today").
+ */
+export type LeisureSummaryBase = Omit<LeisureSummary, 'plannedToday'>;

@@ -1,6 +1,7 @@
 -- Database security tests for the Tempo Livre (leisure) domain: RLS on
--- leisure_items, leisure_plan_entries, leisure_log_entries, leisure_notes,
--- leisure_collections and leisure_collection_items.
+-- leisure_items, leisure_plan_entries, leisure_plan_entry_completions,
+-- leisure_log_entries, leisure_notes, leisure_collections and
+-- leisure_collection_items.
 -- Run with: `supabase test db` (requires `supabase start`).
 --
 -- Proves, for every table:
@@ -10,11 +11,14 @@
 -- Plus:
 --   * leisure_plan_entries.leisure_item_id survives the owning item's
 --     deletion (ON DELETE SET NULL), instead of cascading.
+--   * leisure_plan_entry_completions rows are cascade-deleted with their
+--     owning leisure_plan_entries row (ON DELETE CASCADE) - unlike
+--     leisure_item_id above, a completion is meaningless without its entry.
 --   * leisure_collection_items enforces the same per-user isolation as its
 --     parent tables even though it's a plain junction table.
 
 begin;
-select plan(20);
+select plan(24);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -30,10 +34,15 @@ values
   ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'movie', 'A''s Movie', 'backlog', 'fixed', '{"runtime": 120}'),
   ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'movie', 'B''s Movie', 'backlog', 'fixed', '{"runtime": 90}');
 
-insert into public.leisure_plan_entries (id, user_id, leisure_item_id, title, date)
+insert into public.leisure_plan_entries (id, user_id, leisure_item_id, title, date, recurrence)
 values
-  ('aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001', 'A plan', current_date),
-  ('bbbbbbbb-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-0000-0000-0000-000000000001', 'B plan', current_date);
+  ('aaaaaaaa-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000001', 'A plan', current_date, 'daily'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-0000-0000-0000-000000000001', 'B plan', current_date, 'daily');
+
+insert into public.leisure_plan_entry_completions (id, user_id, plan_entry_id, occurrence_date)
+values
+  ('aaaaaaaa-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-0000-0000-0000-000000000002', current_date),
+  ('bbbbbbbb-0000-0000-0000-000000000006', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-0000-0000-0000-000000000002', current_date);
 
 insert into public.leisure_log_entries (id, user_id, leisure_item_id, activity_type, title, completed_at)
 values
@@ -72,6 +81,12 @@ select is(
 );
 
 select is(
+  (select count(*)::int from public.leisure_plan_entry_completions),
+  1,
+  'User A sees only their own leisure_plan_entry_completions row'
+);
+
+select is(
   (select count(*)::int from public.leisure_log_entries),
   1,
   'User A sees only their own leisure_log_entries row'
@@ -101,6 +116,9 @@ update public.leisure_plan_entries set title = 'hijacked' where id = 'bbbbbbbb-0
 update public.leisure_notes set content = 'hijacked' where id = 'bbbbbbbb-0000-0000-0000-000000000004';
 update public.leisure_collections set name = 'hijacked' where id = 'bbbbbbbb-0000-0000-0000-000000000005';
 delete from public.leisure_items where id = 'bbbbbbbb-0000-0000-0000-000000000001';
+-- leisure_plan_entry_completions has no update grant (see migration) - only
+-- delete isolation applies here.
+delete from public.leisure_plan_entry_completions where id = 'bbbbbbbb-0000-0000-0000-000000000006';
 
 -- User A can insert their own row, but never on User B's behalf.
 select throws_ok(
@@ -144,6 +162,12 @@ select is(
   'User A''s DELETE against User B''s leisure_items row silently affected 0 rows'
 );
 
+select is(
+  (select count(*)::int from public.leisure_plan_entry_completions where id = 'bbbbbbbb-0000-0000-0000-000000000006'),
+  1,
+  'User A''s DELETE against User B''s leisure_plan_entry_completions row silently affected 0 rows'
+);
+
 -- --- ON DELETE SET NULL: deleting an item never cascades into plan/log ----
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
@@ -174,6 +198,15 @@ select is(
   'Deleting the item cascade-deleted its leisure_collection_items row (ON DELETE CASCADE)'
 );
 
+-- --- ON DELETE CASCADE: deleting a plan entry takes its completions too ---
+delete from public.leisure_plan_entries where id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+select is(
+  (select count(*)::int from public.leisure_plan_entry_completions where plan_entry_id = 'aaaaaaaa-0000-0000-0000-000000000002'),
+  0,
+  'Deleting the plan entry cascade-deleted its leisure_plan_entry_completions row (ON DELETE CASCADE)'
+);
+
 reset role;
 reset request.jwt.claims;
 
@@ -192,6 +225,13 @@ select throws_ok(
   '42501',
   null,
   'anon has no SELECT privilege on public.leisure_plan_entries'
+);
+
+select throws_ok(
+  $$ select count(*)::int from public.leisure_plan_entry_completions $$,
+  '42501',
+  null,
+  'anon has no SELECT privilege on public.leisure_plan_entry_completions'
 );
 
 select throws_ok(

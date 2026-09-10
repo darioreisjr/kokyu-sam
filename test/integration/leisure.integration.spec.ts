@@ -38,6 +38,7 @@ interface PlanEntryBody {
   id: string;
   title: string;
   date: string;
+  occurrenceDate: string;
   completed: boolean;
 }
 
@@ -247,6 +248,49 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect(deleted.status).toBe(204);
   });
 
+  it('daily plan entry: appears on every day from its anchor date, and completing one day never affects the others', async () => {
+    const { accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+    const toDateKey = (date: Date) => date.toISOString().slice(0, 10);
+    const anchor = new Date(Date.now() + 24 * 60 * 60 * 1000); // tomorrow, see the note above
+    const anchorDate = toDateKey(anchor);
+    const day2 = toDateKey(new Date(anchor.getTime() + 24 * 60 * 60 * 1000));
+    const day3 = toDateKey(new Date(anchor.getTime() + 2 * 24 * 60 * 60 * 1000));
+
+    const created = await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Alongar',
+      date: anchorDate,
+      recurrence: 'daily',
+    });
+    expect(created.status).toBe(201);
+    const entry = created.body as PlanEntryBody;
+
+    const listed = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${anchorDate}&endDate=${day3}`),
+    );
+    expect(listed.status).toBe(200);
+    const occurrences = (listed.body as PlanEntryBody[])
+      .filter((e) => e.id === entry.id)
+      .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
+    expect(occurrences.map((e) => e.occurrenceDate)).toEqual([anchorDate, day2, day3]);
+    expect(occurrences.every((e) => e.completed === false)).toBe(true);
+
+    const completed = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${entry.id}/complete`),
+    ).send({ date: day2 });
+    expect(completed.status).toBe(201);
+    expect((completed.body as PlanEntryBody).occurrenceDate).toBe(day2);
+    expect((completed.body as PlanEntryBody).completed).toBe(true);
+
+    const listedAfter = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${anchorDate}&endDate=${day3}`),
+    );
+    const occurrencesAfter = (listedAfter.body as PlanEntryBody[])
+      .filter((e) => e.id === entry.id)
+      .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
+    expect(occurrencesAfter.map((e) => e.completed)).toEqual([false, true, false]);
+  });
+
   it('history: logs an occurrence and lists it back, most recent first', async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
@@ -360,6 +404,27 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect(body.inProgress?.title).toBe('Jogando agora');
     expect(body.plannedToday?.title).toBe('Plano de hoje');
     expect(body.backlogCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("summary: a daily entry still counts as a later day's next plan entry, not just its own anchor date", async () => {
+    const { accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+    // Anchored today (the past-date guard forbids creating one anchored
+    // earlier - see findPastPlanEntryViolation), checked against
+    // tomorrow's summary instead: the whole point of this fix is that a
+    // daily/weekly entry isn't only "planned" on its own literal `date`.
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Alongar',
+      date: today,
+      recurrence: 'daily',
+    });
+
+    const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${tomorrow}`));
+    expect(summary.status).toBe(200);
+    expect((summary.body as SummaryBody).plannedToday?.title).toBe('Alongar');
   });
 
   it('cover upload flow: upload-url is scoped to the caller, the uploaded object is publicly readable, and the resulting URL saves as coverImage', async () => {

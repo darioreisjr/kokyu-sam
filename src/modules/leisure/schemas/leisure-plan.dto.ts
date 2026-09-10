@@ -10,8 +10,14 @@ export class LeisurePlanEntryDto {
   @ApiProperty()
   title!: string;
 
-  @ApiProperty({ description: 'YYYY-MM-DD' })
+  @ApiProperty({ description: "YYYY-MM-DD, the series' anchor/start date." })
   date!: string;
+
+  @ApiProperty({
+    description:
+      'YYYY-MM-DD, the specific day this instance falls on - equal to `date` unless this is a daily/weekly occurrence returned by GET /leisure/plan.',
+  })
+  occurrenceDate!: string;
 
   @ApiProperty({ nullable: true })
   startTime!: string | null;
