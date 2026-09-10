@@ -45,6 +45,7 @@ interface PlanEntryBody {
 interface LogEntryBody {
   id: string;
   title: string;
+  activityType: string;
 }
 
 interface NoteBody {
@@ -244,6 +245,16 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect(completed.status).toBe(201);
     expect((completed.body as PlanEntryBody).completed).toBe(true);
 
+    // Completing a plan entry must log it to Histórico too - an ad hoc
+    // entry (no leisureItemId) logs as activityType 'custom'.
+    const historyAfterComplete = await auth(request(server()).get('/api/v1/leisure/history'));
+    expect(historyAfterComplete.status).toBe(200);
+    expect(
+      (historyAfterComplete.body as LogEntryBody[]).some(
+        (log) => log.title === 'Assistir um filme' && log.activityType === 'custom',
+      ),
+    ).toBe(true);
+
     const deleted = await auth(request(server()).delete(`/api/v1/leisure/plan/${entry.id}`));
     expect(deleted.status).toBe(204);
   });
@@ -289,6 +300,13 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       .filter((e) => e.id === entry.id)
       .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
     expect(occurrencesAfter.map((e) => e.completed)).toEqual([false, true, false]);
+
+    // Exactly one Histórico entry for the completed occurrence - not one
+    // per day of the series.
+    const history = await auth(request(server()).get('/api/v1/leisure/history'));
+    expect((history.body as LogEntryBody[]).filter((log) => log.title === 'Alongar')).toHaveLength(
+      1,
+    );
   });
 
   it('history: logs an occurrence and lists it back, most recent first', async () => {

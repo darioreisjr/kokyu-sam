@@ -65,15 +65,22 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
     userId: string,
     planEntryId: string,
     occurrenceDate: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const client = this.supabase.getUserScopedClient(accessToken);
 
-    const { error } = await client.from('leisure_plan_entry_completions').upsert(
-      { user_id: userId, plan_entry_id: planEntryId, occurrence_date: occurrenceDate },
-      // Completing the same day twice is a no-op, not a conflict error.
-      { onConflict: 'plan_entry_id,occurrence_date', ignoreDuplicates: true },
-    );
+    // `ignoreDuplicates` compiles to `ON CONFLICT DO NOTHING` - a skipped
+    // conflict row never comes back in `RETURNING`, so an empty `data`
+    // reliably means "already completed", not just "nothing selected".
+    const { data, error } = await client
+      .from('leisure_plan_entry_completions')
+      .upsert(
+        { user_id: userId, plan_entry_id: planEntryId, occurrence_date: occurrenceDate },
+        { onConflict: 'plan_entry_id,occurrence_date', ignoreDuplicates: true },
+      )
+      .select('plan_entry_id');
     if (error) throw mapSupabaseError(error);
+
+    return (data ?? []).length > 0;
   }
 
   async findById(accessToken: string, id: string): Promise<LeisurePlanEntry | null> {

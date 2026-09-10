@@ -15,12 +15,24 @@ import {
   LEISURE_PLAN_REPOSITORY,
   LeisurePlanRepository,
 } from './types/leisure-plan-repository.interface';
+import {
+  LEISURE_HISTORY_REPOSITORY,
+  LeisureHistoryRepository,
+} from './types/leisure-history-repository.interface';
+import {
+  LEISURE_ITEMS_REPOSITORY,
+  LeisureItemsRepository,
+} from './types/leisure-items-repository.interface';
 
 @Injectable()
 export class LeisurePlanService {
   constructor(
     @Inject(LEISURE_PLAN_REPOSITORY)
     private readonly repository: LeisurePlanRepository,
+    @Inject(LEISURE_HISTORY_REPOSITORY)
+    private readonly historyRepository: LeisureHistoryRepository,
+    @Inject(LEISURE_ITEMS_REPOSITORY)
+    private readonly itemsRepository: LeisureItemsRepository,
   ) {}
 
   async findByDateRange(
@@ -82,6 +94,11 @@ export class LeisurePlanService {
    * day. A `'none'`/`'custom'` entry has only ever had one day, so it
    * keeps going through `update()`'s `completed` column exactly as
    * before.
+   *
+   * Either path also appends a `leisure_log_entries` row, but only the
+   * first time a given occurrence/entry is completed - re-completing (a
+   * disabled button on the frontend, but nothing stops a direct API
+   * call) must never duplicate the Histórico entry.
    */
   async complete(
     user: AuthenticatedUser,
@@ -93,10 +110,38 @@ export class LeisurePlanService {
 
     if (existing.recurrence === 'daily' || existing.recurrence === 'weekly') {
       const date = occurrenceDate ?? existing.date;
-      await this.repository.markOccurrenceCompleted(user.accessToken, user.id, id, date);
+      const wasNewCompletion = await this.repository.markOccurrenceCompleted(
+        user.accessToken,
+        user.id,
+        id,
+        date,
+      );
+      if (wasNewCompletion) await this.logCompletion(user, existing);
       return { ...existing, occurrenceDate: date, completed: true };
     }
 
-    return this.update(user, id, { completed: true });
+    if (existing.completed) return existing;
+    const updated = await this.update(user, id, { completed: true });
+    // `existing`, not `updated` - a `{ completed: true }` patch never
+    // touches leisureItemId/title/duration, and `existing` is the value
+    // this method already validated, independent of whatever the
+    // repository's `update()` happens to echo back.
+    await this.logCompletion(user, existing);
+    return updated;
+  }
+
+  /** Best-effort activity type: falls back to `'custom'` for an ad hoc entry (no `leisureItemId`) or one whose item has since been deleted. */
+  private async logCompletion(user: AuthenticatedUser, entry: LeisurePlanEntry): Promise<void> {
+    const item = entry.leisureItemId
+      ? await this.itemsRepository.findById(user.accessToken, entry.leisureItemId)
+      : null;
+
+    await this.historyRepository.create(user.accessToken, user.id, {
+      leisureItemId: entry.leisureItemId,
+      activityType: item?.type ?? 'custom',
+      title: entry.title,
+      completedAt: new Date().toISOString(),
+      duration: entry.duration,
+    });
   }
 }

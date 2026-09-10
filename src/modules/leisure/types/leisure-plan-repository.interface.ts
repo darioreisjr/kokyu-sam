@@ -24,13 +24,19 @@ export interface LeisurePlanRepository {
     startDate: string,
     endDate: string,
   ) => Promise<Set<string>>;
-  /** Records that `occurrenceDate` of `planEntryId`'s series was completed. Idempotent - completing the same day twice is a no-op. */
+  /**
+   * Records that `occurrenceDate` of `planEntryId`'s series was completed.
+   * Idempotent - completing the same day twice is a no-op. Resolves `true`
+   * only the first time (a fresh row was inserted), `false` on every
+   * repeat - the caller's signal for whether this call should also log a
+   * history entry.
+   */
   markOccurrenceCompleted: (
     accessToken: string,
     userId: string,
     planEntryId: string,
     occurrenceDate: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   create: (
     accessToken: string,
     userId: string,

@@ -142,20 +142,48 @@ describe('SupabaseLeisurePlanRepository.findCompletedOccurrences', () => {
 });
 
 describe('SupabaseLeisurePlanRepository.markOccurrenceCompleted', () => {
-  it('upserts a completion, ignoring duplicates', async () => {
-    const upsert = vi.fn(() => Promise.resolve({ error: null }));
+  it('upserts a completion, ignoring duplicates, and reports true on a fresh insert', async () => {
+    const select = vi.fn(() =>
+      Promise.resolve({ data: [{ plan_entry_id: 'plan-1' }], error: null }),
+    );
+    const upsert = vi.fn(() => ({ select }));
     const repository = buildRepository({ from: () => ({ upsert }) });
 
-    await repository.markOccurrenceCompleted('token', 'user-1', 'plan-1', '2026-01-05');
+    const wasNewCompletion = await repository.markOccurrenceCompleted(
+      'token',
+      'user-1',
+      'plan-1',
+      '2026-01-05',
+    );
 
     expect(upsert).toHaveBeenCalledWith(
       { user_id: 'user-1', plan_entry_id: 'plan-1', occurrence_date: '2026-01-05' },
       { onConflict: 'plan_entry_id,occurrence_date', ignoreDuplicates: true },
     );
+    expect(select).toHaveBeenCalledWith('plan_entry_id');
+    expect(wasNewCompletion).toBe(true);
+  });
+
+  it('reports false when the occurrence was already completed (conflict row skipped)', async () => {
+    const select = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    const upsert = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from: () => ({ upsert }) });
+
+    const wasNewCompletion = await repository.markOccurrenceCompleted(
+      'token',
+      'user-1',
+      'plan-1',
+      '2026-01-05',
+    );
+
+    expect(wasNewCompletion).toBe(false);
   });
 
   it('throws a mapped error when the upsert fails', async () => {
-    const upsert = vi.fn(() => Promise.resolve({ error: { code: 'XX000', message: 'boom' } }));
+    const select = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    const upsert = vi.fn(() => ({ select }));
     const repository = buildRepository({ from: () => ({ upsert }) });
 
     await expect(

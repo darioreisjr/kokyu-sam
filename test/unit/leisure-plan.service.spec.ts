@@ -6,6 +6,9 @@ import {
 import { LeisurePlanService } from '../../src/modules/leisure/leisure-plan.service';
 import { LeisurePlanRepository } from '../../src/modules/leisure/types/leisure-plan-repository.interface';
 import { LeisurePlanEntry } from '../../src/modules/leisure/types/leisure-plan-entry.type';
+import { LeisureHistoryRepository } from '../../src/modules/leisure/types/leisure-history-repository.interface';
+import { LeisureItemsRepository } from '../../src/modules/leisure/types/leisure-items-repository.interface';
+import { LeisureItem } from '../../src/modules/leisure/types/leisure-item.type';
 import { buildAuthenticatedUser } from '../factories/authenticated-user.factory';
 
 function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry {
@@ -33,12 +36,70 @@ function buildRepository(overrides: Partial<LeisurePlanRepository> = {}): Leisur
     findByDateRange: vi.fn().mockResolvedValue([buildEntry()]),
     findById: vi.fn().mockResolvedValue(buildEntry()),
     findCompletedOccurrences: vi.fn().mockResolvedValue(new Set()),
-    markOccurrenceCompleted: vi.fn().mockResolvedValue(undefined),
+    markOccurrenceCompleted: vi.fn().mockResolvedValue(true),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
     delete: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
+}
+
+function buildHistoryRepository(
+  overrides: Partial<LeisureHistoryRepository> = {},
+): LeisureHistoryRepository {
+  return {
+    findAll: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue(null),
+    ...overrides,
+  };
+}
+
+function buildItem(overrides: Partial<LeisureItem> = {}): LeisureItem {
+  return {
+    id: 'item-1',
+    userId: 'user-1',
+    type: 'movie',
+    title: 'A movie',
+    description: null,
+    status: 'backlog',
+    coverImage: null,
+    tags: [],
+    priority: null,
+    estimatedDuration: null,
+    durationType: 'unknown',
+    minimumUsefulDuration: null,
+    favorite: false,
+    source: null,
+    sourceUrl: null,
+    recommendedBy: null,
+    details: {},
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    archivedAt: null,
+    ...overrides,
+  };
+}
+
+function buildItemsRepository(
+  overrides: Partial<LeisureItemsRepository> = {},
+): LeisureItemsRepository {
+  return {
+    findAll: vi.fn().mockResolvedValue([]),
+    findById: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue(buildItem()),
+    update: vi.fn().mockResolvedValue(buildItem()),
+    delete: vi.fn().mockResolvedValue(undefined),
+    createCoverUploadUrl: vi.fn(),
+    ...overrides,
+  };
+}
+
+function buildService(
+  repository: LeisurePlanRepository,
+  historyRepository: LeisureHistoryRepository = buildHistoryRepository(),
+  itemsRepository: LeisureItemsRepository = buildItemsRepository(),
+): LeisurePlanService {
+  return new LeisurePlanService(repository, historyRepository, itemsRepository);
 }
 
 describe('LeisurePlanService.findByDateRange', () => {
@@ -47,7 +108,7 @@ describe('LeisurePlanService.findByDateRange', () => {
       findByDateRange: vi.fn().mockResolvedValue([buildEntry({ recurrence: 'daily' })]),
       findCompletedOccurrences: vi.fn().mockResolvedValue(new Set(['plan-1|2026-01-02'])),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser();
 
     const result = await service.findByDateRange(user, '2026-01-01', '2026-01-03');
@@ -75,7 +136,7 @@ describe('LeisurePlanService.findByDateRange', () => {
     const repository = buildRepository({
       findByDateRange: vi.fn().mockResolvedValue([buildEntry({ date: '2026-01-02' })]),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     const result = await service.findByDateRange(
       buildAuthenticatedUser(),
@@ -91,7 +152,7 @@ describe('LeisurePlanService.findByDateRange', () => {
 describe('LeisurePlanService.create', () => {
   it('delegates to the repository with the caller id and access token', async () => {
     const repository = buildRepository();
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
     // Far enough in the future to never become "today"/past for this test's lifetime.
     const input = { title: 'Watch a movie', date: '2099-01-01' };
@@ -103,7 +164,7 @@ describe('LeisurePlanService.create', () => {
 
   it('rejects a date in the past without touching the repository', async () => {
     const repository = buildRepository();
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const input = { title: 'Watch a movie', date: '2000-01-01' };
 
     await expect(service.create(buildAuthenticatedUser(), input)).rejects.toBeInstanceOf(
@@ -118,7 +179,7 @@ describe('LeisurePlanService.update', () => {
     const repository = buildRepository({
       update: vi.fn().mockResolvedValue(buildEntry({ title: 'Renamed' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     const result = await service.update(buildAuthenticatedUser(), 'plan-1', { title: 'Renamed' });
 
@@ -127,7 +188,7 @@ describe('LeisurePlanService.update', () => {
 
   it('throws LeisurePlanEntryNotFoundError when the repository returns null', async () => {
     const repository = buildRepository({ update: vi.fn().mockResolvedValue(null) });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await expect(
       service.update(buildAuthenticatedUser(), 'missing', { title: 'x' }),
@@ -136,7 +197,7 @@ describe('LeisurePlanService.update', () => {
 
   it('does not look up the existing entry when the patch never touches date/startTime/endTime', async () => {
     const repository = buildRepository();
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await service.update(buildAuthenticatedUser(), 'plan-1', { title: 'Renamed' });
 
@@ -147,7 +208,7 @@ describe('LeisurePlanService.update', () => {
     const repository = buildRepository({
       findById: vi.fn().mockResolvedValue(buildEntry({ date: '2000-01-01' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await service.update(buildAuthenticatedUser(), 'plan-1', {
       date: '2000-01-01',
@@ -164,7 +225,7 @@ describe('LeisurePlanService.update', () => {
     const repository = buildRepository({
       findById: vi.fn().mockResolvedValue(buildEntry({ date: '2099-01-01' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await expect(
       service.update(buildAuthenticatedUser(), 'plan-1', { date: '2000-01-01' }),
@@ -174,7 +235,7 @@ describe('LeisurePlanService.update', () => {
 
   it('throws LeisurePlanEntryNotFoundError when the entry to reschedule does not exist', async () => {
     const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await expect(
       service.update(buildAuthenticatedUser(), 'missing', { date: '2099-01-01' }),
@@ -185,7 +246,7 @@ describe('LeisurePlanService.update', () => {
 describe('LeisurePlanService.delete', () => {
   it('delegates to the repository', async () => {
     const repository = buildRepository();
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser();
 
     await service.delete(user, 'plan-1');
@@ -199,7 +260,7 @@ describe('LeisurePlanService.complete', () => {
     const repository = buildRepository({
       findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser();
 
     await service.complete(user, 'plan-1');
@@ -212,7 +273,7 @@ describe('LeisurePlanService.complete', () => {
 
   it('throws LeisurePlanEntryNotFoundError when the entry does not exist', async () => {
     const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
 
     await expect(service.complete(buildAuthenticatedUser(), 'missing')).rejects.toBeInstanceOf(
       LeisurePlanEntryNotFoundError,
@@ -224,7 +285,7 @@ describe('LeisurePlanService.complete', () => {
     const repository = buildRepository({
       findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
 
     const result = await service.complete(user, 'plan-1');
@@ -244,7 +305,7 @@ describe('LeisurePlanService.complete', () => {
     const repository = buildRepository({
       findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'weekly', date: '2026-01-01' })),
     });
-    const service = new LeisurePlanService(repository);
+    const service = buildService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
 
     const result = await service.complete(user, 'plan-1', '2026-01-15');
@@ -256,5 +317,111 @@ describe('LeisurePlanService.complete', () => {
       '2026-01-15',
     );
     expect(result.occurrenceDate).toBe('2026-01-15');
+  });
+
+  it("logs a history entry as 'custom' for an ad hoc (no leisureItemId) entry", async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: null })),
+    });
+    const historyRepository = buildHistoryRepository();
+    const itemsRepository = buildItemsRepository();
+    const service = buildService(repository, historyRepository, itemsRepository);
+    const user = buildAuthenticatedUser({ id: 'user-1' });
+
+    await service.complete(user, 'plan-1');
+
+    expect(itemsRepository.findById).not.toHaveBeenCalled();
+    expect(historyRepository.create).toHaveBeenCalledWith(
+      user.accessToken,
+      'user-1',
+      expect.objectContaining({
+        leisureItemId: null,
+        activityType: 'custom',
+        title: 'Watch a movie',
+        duration: 120,
+      }),
+    );
+  });
+
+  it('resolves activityType from the linked leisure item when one is set', async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: 'item-1' })),
+    });
+    const historyRepository = buildHistoryRepository();
+    const itemsRepository = buildItemsRepository({
+      findById: vi.fn().mockResolvedValue(buildItem({ id: 'item-1', type: 'book' })),
+    });
+    const service = buildService(repository, historyRepository, itemsRepository);
+    const user = buildAuthenticatedUser();
+
+    await service.complete(user, 'plan-1');
+
+    expect(itemsRepository.findById).toHaveBeenCalledWith(user.accessToken, 'item-1');
+    expect(historyRepository.create).toHaveBeenCalledWith(
+      user.accessToken,
+      user.id,
+      expect.objectContaining({ leisureItemId: 'item-1', activityType: 'book' }),
+    );
+  });
+
+  it("falls back to 'custom' when the linked item no longer exists", async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: 'deleted-item' })),
+    });
+    const historyRepository = buildHistoryRepository();
+    const itemsRepository = buildItemsRepository({ findById: vi.fn().mockResolvedValue(null) });
+    const service = buildService(repository, historyRepository, itemsRepository);
+
+    await service.complete(buildAuthenticatedUser(), 'plan-1');
+
+    expect(historyRepository.create).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ activityType: 'custom' }),
+    );
+  });
+
+  it('never logs twice for an already-completed non-recurring entry', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none', completed: true })),
+    });
+    const historyRepository = buildHistoryRepository();
+    const service = buildService(repository, historyRepository);
+
+    const result = await service.complete(buildAuthenticatedUser(), 'plan-1');
+
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(historyRepository.create).not.toHaveBeenCalled();
+    expect(result.completed).toBe(true);
+  });
+
+  it('logs a history entry the first time a recurring occurrence is completed', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+      markOccurrenceCompleted: vi.fn().mockResolvedValue(true),
+    });
+    const historyRepository = buildHistoryRepository();
+    const service = buildService(repository, historyRepository);
+
+    await service.complete(buildAuthenticatedUser(), 'plan-1');
+
+    expect(historyRepository.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('never logs twice for the same recurring occurrence', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+      markOccurrenceCompleted: vi.fn().mockResolvedValue(false),
+    });
+    const historyRepository = buildHistoryRepository();
+    const service = buildService(repository, historyRepository);
+
+    await service.complete(buildAuthenticatedUser(), 'plan-1');
+
+    expect(historyRepository.create).not.toHaveBeenCalled();
   });
 });
