@@ -179,6 +179,22 @@ describe('SupabaseLeisurePlanRepository.findById', () => {
     expect(entry).toEqual(buildExpectedEntry());
   });
 
+  it('strips the seconds Postgres always adds to a `time` column', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({
+        data: buildPlanRow({ start_time: '19:00:00', end_time: '21:00:00' }),
+        error: null,
+      }),
+    );
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    const entry = await repository.findById('token', 'plan-1');
+
+    expect(entry).toEqual(buildExpectedEntry({ startTime: '19:00', endTime: '21:00' }));
+  });
+
   it('returns null when no row matches', async () => {
     const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
     const eq = vi.fn(() => ({ maybeSingle }));

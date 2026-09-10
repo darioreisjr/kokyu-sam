@@ -15,6 +15,16 @@
  * layer being bypassed, not as the primary UX guard.
  */
 
+/**
+ * Postgres' `time` column always round-trips as "HH:mm:ss" regardless of
+ * what was inserted - the API's own contract is "HH:mm", so every row
+ * read back from `leisure_plan_entries` gets normalized through this
+ * before it reaches a DTO (see `SupabaseLeisurePlanRepository.toDomain`).
+ */
+export function toHm(time: string | null): string | null {
+  return time === null ? null : time.slice(0, 5);
+}
+
 /** The date/startTime/endTime a plan entry already had before this write. `undefined` (a fresh `create`) means every field counts as a new pick. */
 export interface PlanEntryPastReference {
   date?: string | null;

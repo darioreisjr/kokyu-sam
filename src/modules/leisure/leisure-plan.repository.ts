@@ -3,6 +3,7 @@ import { mapSupabaseError } from '../../common/errors/supabase-error.mapper';
 import { SupabaseClientFactoryService } from '../../infrastructure/supabase/supabase-client.factory.service';
 import { Database } from '../../infrastructure/supabase/database.types';
 import { LeisureRecurrence } from './constants/leisure-enums.constant';
+import { toHm } from './leisure-plan-date.util';
 import { occurrenceCompletionKey } from './leisure-plan-recurrence.util';
 import {
   LeisurePlanEntry,
@@ -166,8 +167,8 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
       // Overridden by `expandPlanEntriesForRange` when this row produces
       // more than one occurrence within a requested range.
       occurrenceDate: row.date,
-      startTime: row.start_time,
-      endTime: row.end_time,
+      startTime: toHm(row.start_time),
+      endTime: toHm(row.end_time),
       duration: row.duration,
       recurrence: row.recurrence as LeisureRecurrence,
       notes: row.notes,
