@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../common/auth/types/authenticated-user.type';
 import {
+  LeisurePlanEntryCompletionNotTodayError,
   LeisurePlanEntryDateInvalidError,
   LeisurePlanEntryNotFoundError,
 } from '../../common/errors/app.error';
-import { findPastPlanEntryViolation } from './leisure-plan-date.util';
+import { findPastPlanEntryViolation, isTodayKey } from './leisure-plan-date.util';
 import { expandPlanEntriesForRange } from './leisure-plan-recurrence.util';
 import {
   LeisurePlanEntry,
@@ -106,6 +107,13 @@ export class LeisurePlanService {
    * first time a given occurrence/entry is completed - re-completing (a
    * disabled button on the frontend, but nothing stops a direct API
    * call) must never duplicate the Histórico entry.
+   *
+   * An entry/occurrence can only be completed on its own scheduled day
+   * (`isTodayKey`) - defense in depth for the frontend's "Concluir" button
+   * being hidden otherwise. For `'none'`/`'custom'`, the already-completed
+   * short-circuit stays ahead of that check: re-hitting complete on an
+   * already-completed entry must stay a harmless no-op no matter what day
+   * it now is, since only a genuine first-time completion is gated.
    */
   async complete(
     user: AuthenticatedUser,
@@ -117,6 +125,8 @@ export class LeisurePlanService {
 
     if (existing.recurrence === 'daily' || existing.recurrence === 'weekly') {
       const date = occurrenceDate ?? existing.date;
+      if (!isTodayKey(date)) throw new LeisurePlanEntryCompletionNotTodayError();
+
       const wasNewCompletion = await this.repository.markOccurrenceCompleted(
         user.accessToken,
         user.id,
@@ -128,6 +138,8 @@ export class LeisurePlanService {
     }
 
     if (existing.completed) return existing;
+    if (!isTodayKey(existing.date)) throw new LeisurePlanEntryCompletionNotTodayError();
+
     const updated = await this.update(user, id, { completed: true });
     // `existing`, not `updated` - a `{ completed: true }` patch never
     // touches leisureItemId/title/duration, and `existing` is the value

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { findPastPlanEntryViolation } from '../../src/modules/leisure/leisure-plan-date.util';
+import {
+  findPastPlanEntryViolation,
+  isTodayKey,
+} from '../../src/modules/leisure/leisure-plan-date.util';
 
 const NOW = new Date('2026-06-15T14:30:00.000Z');
 
@@ -133,5 +136,19 @@ describe('findPastPlanEntryViolation — update (with reference)', () => {
       NOW,
     );
     expect(violation?.field).toBe('startTime');
+  });
+});
+
+describe('isTodayKey', () => {
+  it("returns true for the server's current UTC date", () => {
+    expect(isTodayKey('2026-06-15', NOW)).toBe(true);
+  });
+
+  it('returns false for a past date', () => {
+    expect(isTodayKey('2026-06-14', NOW)).toBe(false);
+  });
+
+  it('returns false for a future date', () => {
+    expect(isTodayKey('2026-06-16', NOW)).toBe(false);
   });
 });

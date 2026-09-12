@@ -133,6 +133,13 @@ export class LeisurePlanEntryDateInvalidError extends AppError {
   }
 }
 
+/** Thrown when completing a plan entry whose occurrence date isn't today — see `isTodayKey`. */
+export class LeisurePlanEntryCompletionNotTodayError extends AppError {
+  constructor(message = 'Plan entry can only be completed on its scheduled day.') {
+    super(ErrorCode.LEISURE_PLAN_ENTRY_COMPLETION_NOT_TODAY, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
 export class LeisureNoteNotFoundError extends AppError {
   constructor(message = 'Leisure note not found.') {
     super(ErrorCode.LEISURE_NOTE_NOT_FOUND, HttpStatus.NOT_FOUND, message);

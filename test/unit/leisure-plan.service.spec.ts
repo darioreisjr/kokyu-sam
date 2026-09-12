@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  LeisurePlanEntryCompletionNotTodayError,
   LeisurePlanEntryDateInvalidError,
   LeisurePlanEntryNotFoundError,
 } from '../../src/common/errors/app.error';
@@ -10,6 +11,13 @@ import { LeisureHistoryRepository } from '../../src/modules/leisure/types/leisur
 import { LeisureItemsRepository } from '../../src/modules/leisure/types/leisure-items-repository.interface';
 import { LeisureItem } from '../../src/modules/leisure/types/leisure-item.type';
 import { buildAuthenticatedUser } from '../factories/authenticated-user.factory';
+
+// `complete()` now only allows completing an entry/occurrence on its own
+// scheduled day (`isTodayKey`) - fixtures below that exercise a successful
+// completion use the real "today" so they don't rot into a hardcoded past
+// date, mirroring how `create`'s tests use a far-future date to avoid the
+// analogous "not in the past" rule.
+const TODAY = new Date().toISOString().slice(0, 10);
 
 function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry {
   return {
@@ -282,7 +290,7 @@ describe('LeisurePlanService.delete', () => {
 describe('LeisurePlanService.complete', () => {
   it('patches completed to true for a non-recurring entry', async () => {
     const repository = buildRepository({
-      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none' })),
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none', date: TODAY })),
     });
     const service = buildService(repository);
     const user = buildAuthenticatedUser();
@@ -307,7 +315,7 @@ describe('LeisurePlanService.complete', () => {
 
   it('records a per-occurrence completion for a daily entry, defaulting to its own anchor date', async () => {
     const repository = buildRepository({
-      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: TODAY })),
     });
     const service = buildService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
@@ -318,10 +326,10 @@ describe('LeisurePlanService.complete', () => {
       user.accessToken,
       'user-1',
       'plan-1',
-      '2026-01-01',
+      TODAY,
     );
     expect(repository.update).not.toHaveBeenCalled();
-    expect(result.occurrenceDate).toBe('2026-01-01');
+    expect(result.occurrenceDate).toBe(TODAY);
     expect(result.completed).toBe(true);
   });
 
@@ -332,20 +340,50 @@ describe('LeisurePlanService.complete', () => {
     const service = buildService(repository);
     const user = buildAuthenticatedUser({ id: 'user-1' });
 
-    const result = await service.complete(user, 'plan-1', '2026-01-15');
+    const result = await service.complete(user, 'plan-1', TODAY);
 
     expect(repository.markOccurrenceCompleted).toHaveBeenCalledWith(
       user.accessToken,
       'user-1',
       'plan-1',
-      '2026-01-15',
+      TODAY,
     );
-    expect(result.occurrenceDate).toBe('2026-01-15');
+    expect(result.occurrenceDate).toBe(TODAY);
+  });
+
+  it('rejects completing a daily/weekly occurrence whose date is not today', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'weekly', date: '2026-01-01' })),
+    });
+    const service = buildService(repository);
+
+    await expect(
+      service.complete(buildAuthenticatedUser(), 'plan-1', '2000-01-01'),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryCompletionNotTodayError);
+    expect(repository.markOccurrenceCompleted).not.toHaveBeenCalled();
+  });
+
+  it('rejects completing a non-recurring entry whose date is not today', async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'none', date: '2000-01-01', completed: false }),
+        ),
+    });
+    const service = buildService(repository);
+
+    await expect(service.complete(buildAuthenticatedUser(), 'plan-1')).rejects.toBeInstanceOf(
+      LeisurePlanEntryCompletionNotTodayError,
+    );
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it("logs a history entry as 'custom' for an ad hoc (no leisureItemId) entry", async () => {
     const repository = buildRepository({
-      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: null })),
+      findById: vi
+        .fn()
+        .mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: null, date: TODAY })),
     });
     const historyRepository = buildHistoryRepository();
     const itemsRepository = buildItemsRepository();
@@ -371,7 +409,9 @@ describe('LeisurePlanService.complete', () => {
     const repository = buildRepository({
       findById: vi
         .fn()
-        .mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: 'item-1' })),
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'none', leisureItemId: 'item-1', date: TODAY }),
+        ),
     });
     const historyRepository = buildHistoryRepository();
     const itemsRepository = buildItemsRepository({
@@ -394,7 +434,9 @@ describe('LeisurePlanService.complete', () => {
     const repository = buildRepository({
       findById: vi
         .fn()
-        .mockResolvedValue(buildEntry({ recurrence: 'none', leisureItemId: 'deleted-item' })),
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'none', leisureItemId: 'deleted-item', date: TODAY }),
+        ),
     });
     const historyRepository = buildHistoryRepository();
     const itemsRepository = buildItemsRepository({ findById: vi.fn().mockResolvedValue(null) });
@@ -425,7 +467,7 @@ describe('LeisurePlanService.complete', () => {
 
   it('logs a history entry the first time a recurring occurrence is completed', async () => {
     const repository = buildRepository({
-      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: TODAY })),
       markOccurrenceCompleted: vi.fn().mockResolvedValue(true),
     });
     const historyRepository = buildHistoryRepository();
@@ -438,7 +480,7 @@ describe('LeisurePlanService.complete', () => {
 
   it('never logs twice for the same recurring occurrence', async () => {
     const repository = buildRepository({
-      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: '2026-01-01' })),
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'daily', date: TODAY })),
       markOccurrenceCompleted: vi.fn().mockResolvedValue(false),
     });
     const historyRepository = buildHistoryRepository();

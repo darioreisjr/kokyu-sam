@@ -215,16 +215,18 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
   it('plan entry lifecycle: create -> list by date range -> reschedule -> complete -> delete', async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
-    // Tomorrow, not today: a fixed clock time like '20:00' would otherwise
-    // flake once the wall clock passes it (now that plan entries reject a
-    // past date/time — see `findPastPlanEntryViolation`).
-    const planDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Today, not tomorrow: `complete()` now only allows completing an entry
+    // on its own scheduled day (see `isTodayKey`), so this test needs the
+    // entry it completes to be dated today. The start/end times are pushed
+    // to the very end of the day so they stay in the future relative to
+    // "now" at creation time (see `findPastPlanEntryViolation`).
+    const planDate = new Date().toISOString().slice(0, 10);
 
     const created = await auth(request(server()).post('/api/v1/leisure/plan')).send({
       title: 'Assistir um filme',
       date: planDate,
-      startTime: '20:00',
-      endTime: '22:00',
+      startTime: '23:58',
+      endTime: '23:59',
       duration: 120,
     });
     expect(created.status).toBe(201);
@@ -242,7 +244,7 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
 
     const rescheduled = await auth(
       request(server()).patch(`/api/v1/leisure/plan/${entry.id}`),
-    ).send({ startTime: '21:00' });
+    ).send({ startTime: '23:57' });
     expect(rescheduled.status).toBe(200);
 
     const completed = await auth(
@@ -272,7 +274,12 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
     const toDateKey = (date: Date) => date.toISOString().slice(0, 10);
-    const anchor = new Date(Date.now() + 24 * 60 * 60 * 1000); // tomorrow, see the note above
+    // Anchored today, not tomorrow: `complete()` now only allows completing
+    // an occurrence on its own scheduled day (see `isTodayKey`), and this
+    // test completes the anchor occurrence itself. The start/end times sit
+    // at the very end of the day so they stay in the future relative to
+    // "now" at creation time (see `findPastPlanEntryViolation`).
+    const anchor = new Date();
     const anchorDate = toDateKey(anchor);
     const day2 = toDateKey(new Date(anchor.getTime() + 24 * 60 * 60 * 1000));
     const day3 = toDateKey(new Date(anchor.getTime() + 2 * 24 * 60 * 60 * 1000));
@@ -281,8 +288,8 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       title: 'Alongar',
       date: anchorDate,
       recurrence: 'daily',
-      startTime: '07:00',
-      endTime: '07:30',
+      startTime: '23:58',
+      endTime: '23:59',
       duration: 30,
     });
     expect(created.status).toBe(201);
@@ -300,9 +307,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
 
     const completed = await auth(
       request(server()).post(`/api/v1/leisure/plan/${entry.id}/complete`),
-    ).send({ date: day2 });
+    ).send({ date: anchorDate });
     expect(completed.status).toBe(201);
-    expect((completed.body as PlanEntryBody).occurrenceDate).toBe(day2);
+    expect((completed.body as PlanEntryBody).occurrenceDate).toBe(anchorDate);
     expect((completed.body as PlanEntryBody).completed).toBe(true);
 
     const listedAfter = await auth(
@@ -311,13 +318,57 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     const occurrencesAfter = (listedAfter.body as PlanEntryBody[])
       .filter((e) => e.id === entry.id)
       .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
-    expect(occurrencesAfter.map((e) => e.completed)).toEqual([false, true, false]);
+    expect(occurrencesAfter.map((e) => e.completed)).toEqual([true, false, false]);
 
     // Exactly one Histórico entry for the completed occurrence - not one
     // per day of the series.
     const history = await auth(request(server()).get('/api/v1/leisure/history'));
     expect((history.body as LogEntryBody[]).filter((log) => log.title === 'Alongar')).toHaveLength(
       1,
+    );
+  });
+
+  it('rejects completing a plan entry/occurrence whose date is not today', async () => {
+    const { accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const oneOff = await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Ler um livro',
+      date: tomorrow,
+      startTime: '20:00',
+      endTime: '21:00',
+      duration: 60,
+    });
+    expect(oneOff.status).toBe(201);
+    const oneOffEntry = oneOff.body as PlanEntryBody;
+
+    const oneOffCompleted = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${oneOffEntry.id}/complete`),
+    );
+    expect(oneOffCompleted.status).toBe(400);
+    expect((oneOffCompleted.body as { code: string }).code).toBe(
+      'LEISURE_PLAN_ENTRY_COMPLETION_NOT_TODAY',
+    );
+
+    const daily = await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Alongar de novo',
+      date: today,
+      recurrence: 'daily',
+      startTime: '23:58',
+      endTime: '23:59',
+      duration: 30,
+    });
+    expect(daily.status).toBe(201);
+    const dailyEntry = daily.body as PlanEntryBody;
+
+    const dailyCompleted = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${dailyEntry.id}/complete`),
+    ).send({ date: tomorrow });
+    expect(dailyCompleted.status).toBe(400);
+    expect((dailyCompleted.body as { code: string }).code).toBe(
+      'LEISURE_PLAN_ENTRY_COMPLETION_NOT_TODAY',
     );
   });
 

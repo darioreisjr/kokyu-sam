@@ -51,6 +51,16 @@ export interface PlanEntryPastViolation {
  * in `create`) — so an entry already planned in the past stays
  * editable (title, notes, ...) without being forced onto a fresh date.
  */
+/**
+ * Whether `dateKey` ("YYYY-MM-DD") is the server's current UTC date —
+ * same clock/tradeoff as `findPastPlanEntryViolation` above. Backs
+ * `LeisurePlanService.complete()`'s "only completable on its scheduled
+ * day" rule.
+ */
+export function isTodayKey(dateKey: string, now: Date = new Date()): boolean {
+  return dateKey === now.toISOString().slice(0, 10);
+}
+
 export function findPastPlanEntryViolation(
   input: PlanEntryDateInput,
   reference?: PlanEntryPastReference,
