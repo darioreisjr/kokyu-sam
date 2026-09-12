@@ -17,6 +17,8 @@ function buildPlanRow(overrides: Record<string, unknown> = {}) {
     reminder: false,
     completed: false,
     created_at: '2026-01-01T00:00:00.000Z',
+    archived: false,
+    archived_at: null,
     ...overrides,
   };
 }
@@ -37,6 +39,8 @@ function buildExpectedEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisureP
     reminder: false,
     completed: false,
     createdAt: '2026-01-01T00:00:00.000Z',
+    archived: false,
+    archivedAt: null,
     ...overrides,
   };
 }
@@ -49,17 +53,19 @@ function buildRepository(client: unknown): SupabaseLeisurePlanRepository {
 }
 
 describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
-  it('queries candidates up to endDate, recurring or anchored on/after startDate, ordered ascending', async () => {
+  it('queries candidates up to endDate, recurring or anchored on/after startDate, excluding archived, ordered ascending', async () => {
     const order = vi.fn(() => Promise.resolve({ data: [buildPlanRow()], error: null }));
     const or = vi.fn(() => ({ order }));
     const lte = vi.fn(() => ({ or }));
-    const select = vi.fn(() => ({ lte }));
+    const eq = vi.fn(() => ({ lte }));
+    const select = vi.fn(() => ({ eq }));
     const from = vi.fn(() => ({ select }));
     const repository = buildRepository({ from });
 
     const entries = await repository.findByDateRange('token', '2026-01-01', '2026-01-31');
 
     expect(from).toHaveBeenCalledWith('leisure_plan_entries');
+    expect(eq).toHaveBeenCalledWith('archived', false);
     expect(lte).toHaveBeenCalledWith('date', '2026-01-31');
     expect(or).toHaveBeenCalledWith('recurrence.neq.none,date.gte.2026-01-01');
     expect(entries).toEqual([buildExpectedEntry()]);
@@ -69,7 +75,8 @@ describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
     const order = vi.fn(() => Promise.resolve({ data: null, error: null }));
     const or = vi.fn(() => ({ order }));
     const lte = vi.fn(() => ({ or }));
-    const select = vi.fn(() => ({ lte }));
+    const eq = vi.fn(() => ({ lte }));
+    const select = vi.fn(() => ({ eq }));
     const repository = buildRepository({ from: () => ({ select }) });
 
     await expect(repository.findByDateRange('token', '2026-01-01', '2026-01-31')).resolves.toEqual(
@@ -83,7 +90,8 @@ describe('SupabaseLeisurePlanRepository.findByDateRange', () => {
     );
     const or = vi.fn(() => ({ order }));
     const lte = vi.fn(() => ({ or }));
-    const select = vi.fn(() => ({ lte }));
+    const eq = vi.fn(() => ({ lte }));
+    const select = vi.fn(() => ({ eq }));
     const repository = buildRepository({ from: () => ({ select }) });
 
     await expect(
@@ -298,22 +306,113 @@ describe('SupabaseLeisurePlanRepository.update', () => {
   });
 });
 
-describe('SupabaseLeisurePlanRepository.delete', () => {
-  it('deletes by id', async () => {
-    const eq = vi.fn(() => Promise.resolve({ error: null }));
-    const del = vi.fn(() => ({ eq }));
-    const repository = buildRepository({ from: () => ({ delete: del }) });
+describe('SupabaseLeisurePlanRepository.archive', () => {
+  it('sets archived true and archived_at, returning the updated row', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({
+        data: buildPlanRow({ archived: true, archived_at: '2026-01-02T00:00:00.000Z' }),
+        error: null,
+      }),
+    );
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
 
-    await repository.delete('token', 'plan-1');
+    const entry = await repository.archive('token', 'plan-1');
 
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ archived: true, archived_at: expect.any(String) }),
+    );
     expect(eq).toHaveBeenCalledWith('id', 'plan-1');
+    expect(entry?.archived).toBe(true);
   });
 
-  it('throws a mapped error when delete fails', async () => {
-    const eq = vi.fn(() => Promise.resolve({ error: { code: 'XX000', message: 'boom' } }));
-    const del = vi.fn(() => ({ eq }));
-    const repository = buildRepository({ from: () => ({ delete: del }) });
+  it('returns null when no row matched', async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
 
-    await expect(repository.delete('token', 'plan-1')).rejects.toBeInstanceOf(Error);
+    await expect(repository.archive('token', 'missing')).resolves.toBeNull();
+  });
+
+  it('throws a mapped error when the update fails', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
+
+    await expect(repository.archive('token', 'plan-1')).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe('SupabaseLeisurePlanRepository.unarchive', () => {
+  it('sets archived false and clears archived_at, returning the updated row', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: buildPlanRow({ archived: false, archived_at: null }), error: null }),
+    );
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
+
+    const entry = await repository.unarchive('token', 'plan-1');
+
+    expect(update).toHaveBeenCalledWith({ archived: false, archived_at: null });
+    expect(eq).toHaveBeenCalledWith('id', 'plan-1');
+    expect(entry?.archived).toBe(false);
+  });
+
+  it('returns null when no row matched', async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
+
+    await expect(repository.unarchive('token', 'missing')).resolves.toBeNull();
+  });
+});
+
+describe('SupabaseLeisurePlanRepository.findArchived', () => {
+  it('queries only archived rows, ordered ascending by date', async () => {
+    const order = vi.fn(() =>
+      Promise.resolve({ data: [buildPlanRow({ archived: true })], error: null }),
+    );
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from });
+
+    const entries = await repository.findArchived('token');
+
+    expect(from).toHaveBeenCalledWith('leisure_plan_entries');
+    expect(eq).toHaveBeenCalledWith('archived', true);
+    expect(entries).toEqual([buildExpectedEntry({ archived: true })]);
+  });
+
+  it('returns an empty array when data is null', async () => {
+    const order = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.findArchived('token')).resolves.toEqual([]);
+  });
+
+  it('throws a mapped error when the query fails', async () => {
+    const order = vi.fn(() =>
+      Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }),
+    );
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ select }) });
+
+    await expect(repository.findArchived('token')).rejects.toBeInstanceOf(Error);
   });
 });

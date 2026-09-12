@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../../common/auth/types/authenticated-user.type';
 import {
+  LeisurePlanEntryArchivedError,
   LeisurePlanEntryCompletionNotTodayError,
   LeisurePlanEntryDateInvalidError,
   LeisurePlanEntryNotFoundError,
@@ -71,17 +72,25 @@ export class LeisurePlanService {
     return this.repository.create(user.accessToken, user.id, input);
   }
 
+  /**
+   * Updates a plan entry (e.g. reschedule). Always reads `existing` first —
+   * both to validate a new date/startTime/endTime pick and, now, to reject
+   * outright when the entry is archived: `archived`/`archivedAt` aren't
+   * part of `LeisurePlanEntryUpdateInput` at all, so an archived entry is
+   * read-only here — `archive`/`unarchive` are its only remaining mutations.
+   */
   async update(
     user: AuthenticatedUser,
     id: string,
     patch: LeisurePlanEntryUpdateInput,
   ): Promise<LeisurePlanEntry> {
-    // Only a patch that actually touches date/startTime/endTime needs the
-    // extra read — e.g. `complete()`'s `{ completed: true }` never does.
-    if (patch.date !== undefined || patch.startTime !== undefined || patch.endTime !== undefined) {
-      const existing = await this.repository.findById(user.accessToken, id);
-      if (!existing) throw new LeisurePlanEntryNotFoundError();
+    const existing = await this.repository.findById(user.accessToken, id);
+    if (!existing) throw new LeisurePlanEntryNotFoundError();
+    if (existing.archived) throw new LeisurePlanEntryArchivedError();
 
+    // Only a patch that actually touches date/startTime/endTime needs the
+    // past-date check — e.g. `complete()`'s `{ completed: true }` never does.
+    if (patch.date !== undefined || patch.startTime !== undefined || patch.endTime !== undefined) {
       const violation = findPastPlanEntryViolation(patch, existing);
       if (violation) throw new LeisurePlanEntryDateInvalidError(violation.message);
     }
@@ -91,8 +100,38 @@ export class LeisurePlanService {
     return updated;
   }
 
-  async delete(user: AuthenticatedUser, id: string): Promise<void> {
-    await this.repository.delete(user.accessToken, id);
+  /**
+   * Archives a plan entry. This is the *only* removal mechanism a plan
+   * entry ever has — it is never hard-deleted, at this layer or any other
+   * (see the RLS policy change dropping `leisure_plan_entries`' delete
+   * policy entirely). Reversible via `unarchive`. Idempotent: archiving an
+   * already-archived entry is a no-op success, matching `complete()`'s
+   * existing `if (existing.completed) return existing;` spirit.
+   */
+  async archive(user: AuthenticatedUser, id: string): Promise<LeisurePlanEntry> {
+    const existing = await this.repository.findById(user.accessToken, id);
+    if (!existing) throw new LeisurePlanEntryNotFoundError();
+    if (existing.archived) return existing;
+
+    const archived = await this.repository.archive(user.accessToken, id);
+    if (!archived) throw new LeisurePlanEntryNotFoundError();
+    return archived;
+  }
+
+  /** Inverse of `archive` — also idempotent when the entry is already unarchived. */
+  async unarchive(user: AuthenticatedUser, id: string): Promise<LeisurePlanEntry> {
+    const existing = await this.repository.findById(user.accessToken, id);
+    if (!existing) throw new LeisurePlanEntryNotFoundError();
+    if (!existing.archived) return existing;
+
+    const unarchived = await this.repository.unarchive(user.accessToken, id);
+    if (!unarchived) throw new LeisurePlanEntryNotFoundError();
+    return unarchived;
+  }
+
+  /** Every archived entry for the caller, as flat rows by their own `date` — no recurrence expansion, see `LeisurePlanRepository.findArchived`. */
+  findArchived(user: AuthenticatedUser): Promise<LeisurePlanEntry[]> {
+    return this.repository.findArchived(user.accessToken);
   }
 
   /**
@@ -114,6 +153,10 @@ export class LeisurePlanService {
    * short-circuit stays ahead of that check: re-hitting complete on an
    * already-completed entry must stay a harmless no-op no matter what day
    * it now is, since only a genuine first-time completion is gated.
+   *
+   * An archived entry can't be completed either — that check runs before
+   * the already-completed short-circuit, since an archived entry is meant
+   * to be inert regardless of its prior `completed` state.
    */
   async complete(
     user: AuthenticatedUser,
@@ -122,6 +165,7 @@ export class LeisurePlanService {
   ): Promise<LeisurePlanEntry> {
     const existing = await this.repository.findById(user.accessToken, id);
     if (!existing) throw new LeisurePlanEntryNotFoundError();
+    if (existing.archived) throw new LeisurePlanEntryArchivedError();
 
     if (existing.recurrence === 'daily' || existing.recurrence === 'weekly') {
       const date = occurrenceDate ?? existing.date;

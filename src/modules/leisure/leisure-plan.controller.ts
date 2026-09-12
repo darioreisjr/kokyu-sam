@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -65,6 +54,20 @@ export class LeisurePlanController {
     return this.service.create(user, body);
   }
 
+  // Literal path, declared before `GET :id` — Nest/Express match routes in
+  // registration order, and `:id` would otherwise swallow `/archived` as an
+  // id value (the same ordering concern this controller would have for any
+  // literal segment alongside a param route at the same depth).
+  @Get('archived')
+  @ApiOperation({
+    summary:
+      'Lists every archived plan entry for the caller - flat rows by their own date, no date-range filtering and no recurrence expansion.',
+  })
+  @ApiOkResponse({ type: [LeisurePlanEntryDto] })
+  findArchived(@CurrentUser() user: AuthenticatedUser): Promise<LeisurePlanEntry[]> {
+    return this.service.findArchived(user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Gets a single plan entry by id (e.g. to prefill the edit page).' })
   @ApiOkResponse({ type: LeisurePlanEntryDto })
@@ -86,14 +89,29 @@ export class LeisurePlanController {
     return this.service.update(user, params.id, body);
   }
 
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Deletes a plan entry.' })
-  async delete(
+  @Post(':id/archive')
+  @ApiOperation({
+    summary:
+      'Archives a plan entry - the only way a plan entry is ever removed. Never a hard delete; reversible via POST :id/unarchive. A no-op success if the entry is already archived.',
+  })
+  @ApiOkResponse({ type: LeisurePlanEntryDto })
+  archive(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(UuidParam)) params: { id: string },
-  ): Promise<void> {
-    await this.service.delete(user, params.id);
+  ): Promise<LeisurePlanEntry> {
+    return this.service.archive(user, params.id);
+  }
+
+  @Post(':id/unarchive')
+  @ApiOperation({
+    summary: 'Unarchives a plan entry. A no-op success if the entry is not currently archived.',
+  })
+  @ApiOkResponse({ type: LeisurePlanEntryDto })
+  unarchive(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(UuidParam)) params: { id: string },
+  ): Promise<LeisurePlanEntry> {
+    return this.service.unarchive(user, params.id);
   }
 
   @Post(':id/complete')

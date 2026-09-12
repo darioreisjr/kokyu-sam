@@ -40,6 +40,8 @@ interface PlanEntryBody {
   date: string;
   occurrenceDate: string;
   completed: boolean;
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 interface LogEntryBody {
@@ -212,7 +214,7 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     expect((response.body as { code: string }).code).toBe('VALIDATION_ERROR');
   });
 
-  it('plan entry lifecycle: create -> list by date range -> reschedule -> complete -> delete', async () => {
+  it('plan entry lifecycle: create -> list by date range -> reschedule -> complete -> archive', async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
     // Today, not tomorrow: `complete()` now only allows completing an entry
@@ -263,11 +265,103 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       ),
     ).toBe(true);
 
-    const deleted = await auth(request(server()).delete(`/api/v1/leisure/plan/${entry.id}`));
-    expect(deleted.status).toBe(204);
+    // Plan entries are never hard-deleted - archiving is the only removal
+    // mechanism (see the dedicated archive/unarchive/RLS test below for the
+    // full matrix). The row keeps existing (GET by id still succeeds) but
+    // drops out of the normal date-range view.
+    const archived = await auth(request(server()).post(`/api/v1/leisure/plan/${entry.id}/archive`));
+    expect(archived.status).toBe(201);
+    expect((archived.body as PlanEntryBody).archived).toBe(true);
 
-    const afterDelete = await auth(request(server()).get(`/api/v1/leisure/plan/${entry.id}`));
-    expect(afterDelete.status).toBe(404);
+    const afterArchive = await auth(request(server()).get(`/api/v1/leisure/plan/${entry.id}`));
+    expect(afterArchive.status).toBe(200);
+  });
+
+  it('archive/unarchive: archiving hides the entry and blocks mutation, unarchiving reverses it, and a raw RLS-scoped delete is blocked', async () => {
+    const { accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+    const planDate = new Date().toISOString().slice(0, 10);
+
+    const created = await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Ler um artigo',
+      date: planDate,
+      startTime: '23:58',
+      endTime: '23:59',
+      duration: 30,
+    });
+    expect(created.status).toBe(201);
+    const entry = created.body as PlanEntryBody;
+
+    const archived = await auth(request(server()).post(`/api/v1/leisure/plan/${entry.id}/archive`));
+    expect(archived.status).toBe(201);
+    expect((archived.body as PlanEntryBody).archived).toBe(true);
+    expect((archived.body as PlanEntryBody).archivedAt).not.toBeNull();
+
+    // Disappears from the normal date-range view...
+    const listedAfterArchive = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${planDate}&endDate=${planDate}`),
+    );
+    expect((listedAfterArchive.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(false);
+
+    // ...and appears in the archived list instead.
+    const archivedList = await auth(request(server()).get('/api/v1/leisure/plan/archived'));
+    expect(archivedList.status).toBe(200);
+    expect((archivedList.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(true);
+
+    // Archived entries are read-only: neither a PATCH nor a complete
+    // attempt is allowed through.
+    const rejectedPatch = await auth(
+      request(server()).patch(`/api/v1/leisure/plan/${entry.id}`),
+    ).send({ notes: 'tentativa' });
+    expect(rejectedPatch.status).toBe(400);
+    expect((rejectedPatch.body as { code: string }).code).toBe('LEISURE_PLAN_ENTRY_ARCHIVED');
+
+    const rejectedComplete = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${entry.id}/complete`),
+    );
+    expect(rejectedComplete.status).toBe(400);
+    expect((rejectedComplete.body as { code: string }).code).toBe('LEISURE_PLAN_ENTRY_ARCHIVED');
+
+    // Database-level check: a raw, authenticated Supabase call - bypassing
+    // the Nest app (and its repository, which no longer even has a
+    // delete() method) entirely - still can't delete this row. The
+    // migration both drops leisure_plan_entries' delete policy (so RLS
+    // alone would already deny every row for DELETE) *and* revokes the
+    // DELETE grant itself as belt-and-suspenders, so Postgres rejects the
+    // command outright with "permission denied" (42501) rather than
+    // silently matching zero rows - an even stronger guarantee.
+    const rlsScopedClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+    const rlsDelete = await rlsScopedClient
+      .from('leisure_plan_entries')
+      .delete()
+      .eq('id', entry.id)
+      .select('id');
+    expect(rlsDelete.error?.code).toBe('42501');
+    expect(rlsDelete.data).toBeNull();
+
+    const stillThere = await auth(request(server()).get(`/api/v1/leisure/plan/${entry.id}`));
+    expect(stillThere.status).toBe(200);
+
+    // Unarchiving reverses everything: back in the date-range list, gone
+    // from the archived list.
+    const unarchived = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${entry.id}/unarchive`),
+    );
+    expect(unarchived.status).toBe(201);
+    expect((unarchived.body as PlanEntryBody).archived).toBe(false);
+    expect((unarchived.body as PlanEntryBody).archivedAt).toBeNull();
+
+    const listedAfterUnarchive = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${planDate}&endDate=${planDate}`),
+    );
+    expect((listedAfterUnarchive.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(
+      true,
+    );
+
+    const archivedListAfter = await auth(request(server()).get('/api/v1/leisure/plan/archived'));
+    expect((archivedListAfter.body as PlanEntryBody[]).some((e) => e.id === entry.id)).toBe(false);
   });
 
   it('daily plan entry: appears on every day from its anchor date, and completing one day never affects the others', async () => {

@@ -30,6 +30,7 @@ const TITLES_BY_CODE: Record<ErrorCode, string> = {
   [ErrorCode.LEISURE_PLAN_ENTRY_NOT_FOUND]: 'Leisure plan entry not found',
   [ErrorCode.LEISURE_PLAN_ENTRY_DATE_INVALID]: 'Leisure plan entry date invalid',
   [ErrorCode.LEISURE_PLAN_ENTRY_COMPLETION_NOT_TODAY]: 'Leisure plan entry completion not today',
+  [ErrorCode.LEISURE_PLAN_ENTRY_ARCHIVED]: 'Leisure plan entry archived',
   [ErrorCode.LEISURE_NOTE_NOT_FOUND]: 'Leisure note not found',
   [ErrorCode.LEISURE_COLLECTION_NOT_FOUND]: 'Leisure collection not found',
 };

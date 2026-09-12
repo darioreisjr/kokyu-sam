@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  LeisurePlanEntryArchivedError,
   LeisurePlanEntryCompletionNotTodayError,
   LeisurePlanEntryDateInvalidError,
   LeisurePlanEntryNotFoundError,
@@ -35,6 +36,8 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     reminder: false,
     completed: false,
     createdAt: '2026-01-01T00:00:00.000Z',
+    archived: false,
+    archivedAt: null,
     ...overrides,
   };
 }
@@ -47,7 +50,11 @@ function buildRepository(overrides: Partial<LeisurePlanRepository> = {}): Leisur
     markOccurrenceCompleted: vi.fn().mockResolvedValue(true),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
-    delete: vi.fn().mockResolvedValue(undefined),
+    archive: vi
+      .fn()
+      .mockResolvedValue(buildEntry({ archived: true, archivedAt: '2026-01-02T00:00:00.000Z' })),
+    unarchive: vi.fn().mockResolvedValue(buildEntry({ archived: false, archivedAt: null })),
+    findArchived: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
@@ -227,13 +234,30 @@ describe('LeisurePlanService.update', () => {
     ).rejects.toBeInstanceOf(LeisurePlanEntryNotFoundError);
   });
 
-  it('does not look up the existing entry when the patch never touches date/startTime/endTime', async () => {
+  it('skips the past-date check when the patch never touches date/startTime/endTime', async () => {
     const repository = buildRepository();
     const service = buildService(repository);
 
     await service.update(buildAuthenticatedUser(), 'plan-1', { title: 'Renamed' });
 
-    expect(repository.findById).not.toHaveBeenCalled();
+    // `findById` is still called (now unconditionally, to check `archived`)
+    // but `findPastPlanEntryViolation` never runs for a patch like this one.
+    expect(repository.findById).toHaveBeenCalledWith(expect.any(String), 'plan-1');
+    expect(repository.update).toHaveBeenCalledWith(expect.any(String), 'plan-1', {
+      title: 'Renamed',
+    });
+  });
+
+  it('rejects modifying an archived entry', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ archived: true })),
+    });
+    const service = buildService(repository);
+
+    await expect(
+      service.update(buildAuthenticatedUser(), 'plan-1', { title: 'Renamed' }),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryArchivedError);
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it('allows keeping an already-past date unchanged (e.g. editing just the notes)', async () => {
@@ -275,15 +299,91 @@ describe('LeisurePlanService.update', () => {
   });
 });
 
-describe('LeisurePlanService.delete', () => {
-  it('delegates to the repository', async () => {
+describe('LeisurePlanService.archive', () => {
+  it('archives the entry via the repository', async () => {
     const repository = buildRepository();
     const service = buildService(repository);
     const user = buildAuthenticatedUser();
 
-    await service.delete(user, 'plan-1');
+    const result = await service.archive(user, 'plan-1');
 
-    expect(repository.delete).toHaveBeenCalledWith(user.accessToken, 'plan-1');
+    expect(repository.archive).toHaveBeenCalledWith(user.accessToken, 'plan-1');
+    expect(result.archived).toBe(true);
+  });
+
+  it('is a no-op success when the entry is already archived', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ archived: true })),
+    });
+    const service = buildService(repository);
+
+    const result = await service.archive(buildAuthenticatedUser(), 'plan-1');
+
+    expect(repository.archive).not.toHaveBeenCalled();
+    expect(result.archived).toBe(true);
+  });
+
+  it('throws LeisurePlanEntryNotFoundError when the entry does not exist', async () => {
+    const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
+    const service = buildService(repository);
+
+    await expect(service.archive(buildAuthenticatedUser(), 'missing')).rejects.toBeInstanceOf(
+      LeisurePlanEntryNotFoundError,
+    );
+    expect(repository.archive).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeisurePlanService.unarchive', () => {
+  it('unarchives the entry via the repository', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ archived: true })),
+    });
+    const service = buildService(repository);
+    const user = buildAuthenticatedUser();
+
+    const result = await service.unarchive(user, 'plan-1');
+
+    expect(repository.unarchive).toHaveBeenCalledWith(user.accessToken, 'plan-1');
+    expect(result.archived).toBe(false);
+  });
+
+  it('is a no-op success when the entry is already unarchived', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ archived: false })),
+    });
+    const service = buildService(repository);
+
+    const result = await service.unarchive(buildAuthenticatedUser(), 'plan-1');
+
+    expect(repository.unarchive).not.toHaveBeenCalled();
+    expect(result.archived).toBe(false);
+  });
+
+  it('throws LeisurePlanEntryNotFoundError when the entry does not exist', async () => {
+    const repository = buildRepository({ findById: vi.fn().mockResolvedValue(null) });
+    const service = buildService(repository);
+
+    await expect(service.unarchive(buildAuthenticatedUser(), 'missing')).rejects.toBeInstanceOf(
+      LeisurePlanEntryNotFoundError,
+    );
+    expect(repository.unarchive).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeisurePlanService.findArchived', () => {
+  it('delegates to the repository, returning only archived entries', async () => {
+    const archivedEntry = buildEntry({ id: 'plan-2', archived: true });
+    const repository = buildRepository({
+      findArchived: vi.fn().mockResolvedValue([archivedEntry]),
+    });
+    const service = buildService(repository);
+    const user = buildAuthenticatedUser();
+
+    const result = await service.findArchived(user);
+
+    expect(repository.findArchived).toHaveBeenCalledWith(user.accessToken);
+    expect(result).toEqual([archivedEntry]);
   });
 });
 
@@ -311,6 +411,19 @@ describe('LeisurePlanService.complete', () => {
       LeisurePlanEntryNotFoundError,
     );
     expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects completing an archived entry', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(buildEntry({ recurrence: 'none', archived: true })),
+    });
+    const service = buildService(repository);
+
+    await expect(service.complete(buildAuthenticatedUser(), 'plan-1')).rejects.toBeInstanceOf(
+      LeisurePlanEntryArchivedError,
+    );
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(repository.markOccurrenceCompleted).not.toHaveBeenCalled();
   });
 
   it('records a per-occurrence completion for a daily entry, defaulting to its own anchor date', async () => {

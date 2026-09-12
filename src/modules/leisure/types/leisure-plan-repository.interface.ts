@@ -47,5 +47,10 @@ export interface LeisurePlanRepository {
     id: string,
     patch: LeisurePlanEntryUpdateInput,
   ) => Promise<LeisurePlanEntry | null>;
-  delete: (accessToken: string, id: string) => Promise<void>;
+  /** Sets `archived: true` / `archivedAt: now()`. `null` if no row matches `id` (mirrors `update`'s not-found convention). Plan entries are never hard-deleted - this is the only removal mechanism. */
+  archive: (accessToken: string, id: string) => Promise<LeisurePlanEntry | null>;
+  /** Inverse of `archive`: sets `archived: false` / `archivedAt: null`. `null` if no row matches `id`. */
+  unarchive: (accessToken: string, id: string) => Promise<LeisurePlanEntry | null>;
+  /** Every archived entry for the authenticated user (RLS-scoped), unfiltered by date and never expanded into recurrence occurrences - archived entries are shown as flat rows by their own `date`. */
+  findArchived: (accessToken: string) => Promise<LeisurePlanEntry[]>;
 }

@@ -33,6 +33,7 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
     const { data, error } = await client
       .from('leisure_plan_entries')
       .select('*')
+      .eq('archived', false)
       .lte('date', endDate)
       .or(`recurrence.neq.none,date.gte.${startDate}`)
       .order('date', { ascending: true });
@@ -157,11 +158,49 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
     return data ? this.toDomain(data) : null;
   }
 
-  async delete(accessToken: string, id: string): Promise<void> {
+  async archive(accessToken: string, id: string): Promise<LeisurePlanEntry | null> {
     const client = this.supabase.getUserScopedClient(accessToken);
 
-    const { error } = await client.from('leisure_plan_entries').delete().eq('id', id);
+    const { data, error } = await client
+      .from('leisure_plan_entries')
+      .update({ archived: true, archived_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
     if (error) throw mapSupabaseError(error);
+
+    return data ? this.toDomain(data) : null;
+  }
+
+  async unarchive(accessToken: string, id: string): Promise<LeisurePlanEntry | null> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    const { data, error } = await client
+      .from('leisure_plan_entries')
+      .update({ archived: false, archived_at: null })
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw mapSupabaseError(error);
+
+    return data ? this.toDomain(data) : null;
+  }
+
+  async findArchived(accessToken: string): Promise<LeisurePlanEntry[]> {
+    const client = this.supabase.getUserScopedClient(accessToken);
+
+    // Flat rows by their own `date` - no date-range filtering and no
+    // recurrence expansion. `expandPlanEntriesForRange` only makes sense
+    // for the active calendar view; an archived entry has been pulled out
+    // of that view entirely.
+    const { data, error } = await client
+      .from('leisure_plan_entries')
+      .select('*')
+      .eq('archived', true)
+      .order('date', { ascending: true });
+    if (error) throw mapSupabaseError(error);
+
+    return (data ?? []).map((row) => this.toDomain(row));
   }
 
   private toDomain(row: PlanEntryRow): LeisurePlanEntry {
@@ -182,6 +221,8 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
       reminder: row.reminder,
       completed: row.completed,
       createdAt: row.created_at,
+      archived: row.archived,
+      archivedAt: row.archived_at,
     };
   }
 }

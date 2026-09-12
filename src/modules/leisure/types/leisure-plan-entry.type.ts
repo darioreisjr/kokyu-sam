@@ -25,6 +25,10 @@ export interface LeisurePlanEntry {
   /** For `'daily'`/`'weekly'`, reflects `occurrenceDate` specifically (from `leisure_plan_entry_completions`), never the whole series. */
   completed: boolean;
   createdAt: string;
+  /** Soft-removal flag - the only way a plan entry is ever "deleted". Reversible via `LeisurePlanService.unarchive`; never hard-deleted. */
+  archived: boolean;
+  /** When `archived` was last set to true; cleared back to `null` on unarchive. */
+  archivedAt: string | null;
 }
 
 export interface LeisurePlanEntryCreateInput {

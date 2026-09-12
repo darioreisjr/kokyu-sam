@@ -20,6 +20,8 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     reminder: false,
     completed: false,
     createdAt: '2026-01-01T00:00:00.000Z',
+    archived: false,
+    archivedAt: null,
     ...overrides,
   };
 }
@@ -30,7 +32,11 @@ function buildService(overrides: Partial<Record<keyof LeisurePlanService, unknow
     findById: vi.fn().mockResolvedValue(buildEntry()),
     create: vi.fn().mockResolvedValue(buildEntry()),
     update: vi.fn().mockResolvedValue(buildEntry()),
-    delete: vi.fn().mockResolvedValue(undefined),
+    archive: vi
+      .fn()
+      .mockResolvedValue(buildEntry({ archived: true, archivedAt: '2026-01-02T00:00:00.000Z' })),
+    unarchive: vi.fn().mockResolvedValue(buildEntry({ archived: false, archivedAt: null })),
+    findArchived: vi.fn().mockResolvedValue([buildEntry({ archived: true })]),
     complete: vi.fn().mockResolvedValue(buildEntry({ completed: true })),
     ...overrides,
   } as unknown as LeisurePlanService;
@@ -90,14 +96,37 @@ describe('LeisurePlanController', () => {
     expect(service.update).toHaveBeenCalledWith(user, 'plan-1', body);
   });
 
-  it('DELETE /:id delegates to LeisurePlanService.delete', async () => {
+  it('POST /:id/archive delegates to LeisurePlanService.archive', async () => {
     const service = buildService();
     const controller = new LeisurePlanController(service);
     const user = buildAuthenticatedUser();
 
-    await controller.delete(user, { id: 'plan-1' });
+    const result = await controller.archive(user, { id: 'plan-1' });
 
-    expect(service.delete).toHaveBeenCalledWith(user, 'plan-1');
+    expect(service.archive).toHaveBeenCalledWith(user, 'plan-1');
+    expect(result.archived).toBe(true);
+  });
+
+  it('POST /:id/unarchive delegates to LeisurePlanService.unarchive', async () => {
+    const service = buildService();
+    const controller = new LeisurePlanController(service);
+    const user = buildAuthenticatedUser();
+
+    const result = await controller.unarchive(user, { id: 'plan-1' });
+
+    expect(service.unarchive).toHaveBeenCalledWith(user, 'plan-1');
+    expect(result.archived).toBe(false);
+  });
+
+  it('GET /archived delegates to LeisurePlanService.findArchived', async () => {
+    const service = buildService();
+    const controller = new LeisurePlanController(service);
+    const user = buildAuthenticatedUser();
+
+    const result = await controller.findArchived(user);
+
+    expect(service.findArchived).toHaveBeenCalledWith(user);
+    expect(result).toEqual([buildEntry({ archived: true })]);
   });
 
   it('POST /:id/complete delegates to LeisurePlanService.complete', async () => {

@@ -140,6 +140,18 @@ export class LeisurePlanEntryCompletionNotTodayError extends AppError {
   }
 }
 
+/**
+ * Thrown by `update()`/`complete()` when the target plan entry is archived.
+ * Plan entries are never hard-deleted - archiving is the only removal
+ * mechanism (reversible via `unarchive`), and an archived entry must not be
+ * modifiable or completable through any other path in the meantime.
+ */
+export class LeisurePlanEntryArchivedError extends AppError {
+  constructor(message = 'Plan entry is archived and cannot be modified or completed.') {
+    super(ErrorCode.LEISURE_PLAN_ENTRY_ARCHIVED, HttpStatus.BAD_REQUEST, message);
+  }
+}
+
 export class LeisureNoteNotFoundError extends AppError {
   constructor(message = 'Leisure note not found.') {
     super(ErrorCode.LEISURE_NOTE_NOT_FOUND, HttpStatus.NOT_FOUND, message);

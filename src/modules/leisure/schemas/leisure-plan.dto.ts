@@ -42,4 +42,13 @@ export class LeisurePlanEntryDto {
 
   @ApiProperty()
   createdAt!: string;
+
+  @ApiProperty({
+    description:
+      'Soft-removal flag - the only way a plan entry is ever "deleted". Reversible via POST :id/unarchive.',
+  })
+  archived!: boolean;
+
+  @ApiProperty({ nullable: true })
+  archivedAt!: string | null;
 }

@@ -271,6 +271,8 @@ export type Database = {
       };
       leisure_plan_entries: {
         Row: {
+          archived: boolean;
+          archived_at: string | null;
           completed: boolean;
           created_at: string;
           date: string;
@@ -286,6 +288,8 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          archived?: boolean;
+          archived_at?: string | null;
           completed?: boolean;
           created_at?: string;
           date: string;
@@ -301,6 +305,8 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          archived?: boolean;
+          archived_at?: string | null;
           completed?: boolean;
           created_at?: string;
           date?: string;
