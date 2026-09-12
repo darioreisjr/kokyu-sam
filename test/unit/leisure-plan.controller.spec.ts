@@ -55,7 +55,13 @@ describe('LeisurePlanController', () => {
     const service = buildService();
     const controller = new LeisurePlanController(service);
     const user = buildAuthenticatedUser();
-    const body = { title: 'Watch a movie', date: '2026-01-01' };
+    const body = {
+      title: 'Watch a movie',
+      date: '2026-01-01',
+      startTime: '19:00',
+      endTime: '21:00',
+      duration: 120,
+    };
 
     await controller.create(user, body);
 

@@ -224,6 +224,8 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       title: 'Assistir um filme',
       date: planDate,
       startTime: '20:00',
+      endTime: '22:00',
+      duration: 120,
     });
     expect(created.status).toBe(201);
     const entry = created.body as PlanEntryBody;
@@ -279,6 +281,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       title: 'Alongar',
       date: anchorDate,
       recurrence: 'daily',
+      startTime: '07:00',
+      endTime: '07:30',
+      duration: 30,
     });
     expect(created.status).toBe(201);
     const entry = created.body as PlanEntryBody;
@@ -421,6 +426,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     await auth(request(server()).post('/api/v1/leisure/plan')).send({
       title: 'Plano de hoje',
       date: today,
+      startTime: '18:00',
+      endTime: '19:00',
+      duration: 60,
     });
 
     const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${today}`));
@@ -445,6 +453,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       title: 'Alongar',
       date: today,
       recurrence: 'daily',
+      startTime: '07:00',
+      endTime: '07:30',
+      duration: 30,
     });
 
     const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${tomorrow}`));
