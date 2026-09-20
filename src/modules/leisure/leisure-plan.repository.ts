@@ -113,6 +113,7 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
       end_time: input.endTime ?? null,
       duration: input.duration ?? null,
       recurrence: input.recurrence ?? 'none',
+      custom_dates: input.customDates ?? null,
       notes: input.notes ?? null,
       reminder: input.reminder ?? false,
       completed: input.completed ?? false,
@@ -143,6 +144,7 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
     if (patch.endTime !== undefined) update.end_time = patch.endTime;
     if (patch.duration !== undefined) update.duration = patch.duration;
     if (patch.recurrence !== undefined) update.recurrence = patch.recurrence;
+    if (patch.customDates !== undefined) update.custom_dates = patch.customDates;
     if (patch.notes !== undefined) update.notes = patch.notes;
     if (patch.reminder !== undefined) update.reminder = patch.reminder;
     if (patch.completed !== undefined) update.completed = patch.completed;
@@ -217,6 +219,7 @@ export class SupabaseLeisurePlanRepository implements LeisurePlanRepository {
       endTime: toHm(row.end_time),
       duration: row.duration,
       recurrence: row.recurrence as LeisureRecurrence,
+      customDates: row.custom_dates,
       notes: row.notes,
       reminder: row.reminder,
       completed: row.completed,

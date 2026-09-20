@@ -275,6 +275,7 @@ export type Database = {
           archived_at: string | null;
           completed: boolean;
           created_at: string;
+          custom_dates: string[] | null;
           date: string;
           duration: number | null;
           end_time: string | null;
@@ -292,6 +293,7 @@ export type Database = {
           archived_at?: string | null;
           completed?: boolean;
           created_at?: string;
+          custom_dates?: string[] | null;
           date: string;
           duration?: number | null;
           end_time?: string | null;
@@ -309,6 +311,7 @@ export type Database = {
           archived_at?: string | null;
           completed?: boolean;
           created_at?: string;
+          custom_dates?: string[] | null;
           date?: string;
           duration?: number | null;
           end_time?: string | null;

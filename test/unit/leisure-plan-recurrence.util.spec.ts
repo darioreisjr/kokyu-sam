@@ -17,6 +17,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     endTime: null,
     duration: null,
     recurrence: 'none',
+    customDates: null,
     notes: null,
     reminder: false,
     completed: false,
@@ -48,8 +49,8 @@ describe('expandPlanEntriesForRange — none/custom', () => {
     expect(result).toEqual([]);
   });
 
-  it('treats "custom" the same as "none" (no interval captured to expand from)', () => {
-    const entry = buildEntry({ date: '2026-01-05', recurrence: 'custom' });
+  it('treats a "custom" entry with no customDates the same as "none"', () => {
+    const entry = buildEntry({ date: '2026-01-05', recurrence: 'custom', customDates: null });
     const result = expandPlanEntriesForRange([entry], '2026-01-01', '2026-01-10', new Set());
 
     expect(result).toHaveLength(1);
@@ -151,6 +152,54 @@ describe('expandPlanEntriesForRange — weekly', () => {
     const result = expandPlanEntriesForRange([entry], '2026-01-02', '2026-01-07', new Set());
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('expandPlanEntriesForRange — custom', () => {
+  it('produces one occurrence per explicit date within the range', () => {
+    const entry = buildEntry({
+      date: '2026-01-03',
+      recurrence: 'custom',
+      customDates: ['2026-01-03', '2026-01-07', '2026-01-15'],
+    });
+    const result = expandPlanEntriesForRange([entry], '2026-01-01', '2026-01-10', new Set());
+
+    expect(result.map((e) => e.occurrenceDate)).toEqual(['2026-01-03', '2026-01-07']);
+  });
+
+  it('excludes explicit dates outside the requested range', () => {
+    const entry = buildEntry({
+      date: '2026-01-03',
+      recurrence: 'custom',
+      customDates: ['2025-12-25', '2026-01-03'],
+    });
+    const result = expandPlanEntriesForRange([entry], '2026-01-01', '2026-01-10', new Set());
+
+    expect(result.map((e) => e.occurrenceDate)).toEqual(['2026-01-03']);
+  });
+
+  it('every occurrence keeps `date` as the anchor, not the occurrence day', () => {
+    const entry = buildEntry({
+      date: '2026-01-03',
+      recurrence: 'custom',
+      customDates: ['2026-01-03', '2026-01-07'],
+    });
+    const result = expandPlanEntriesForRange([entry], '2026-01-01', '2026-01-10', new Set());
+
+    expect(result.every((e) => e.date === '2026-01-03')).toBe(true);
+  });
+
+  it('reflects completion per explicit date, independent of the others', () => {
+    const entry = buildEntry({
+      id: 'plan-9',
+      date: '2026-01-03',
+      recurrence: 'custom',
+      customDates: ['2026-01-03', '2026-01-07'],
+    });
+    const completed = new Set([occurrenceCompletionKey('plan-9', '2026-01-07')]);
+    const result = expandPlanEntriesForRange([entry], '2026-01-01', '2026-01-10', completed);
+
+    expect(result.map((e) => e.completed)).toEqual([false, true]);
   });
 });
 

@@ -32,6 +32,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     endTime: null,
     duration: 120,
     recurrence: 'none',
+    customDates: null,
     notes: null,
     reminder: false,
     completed: false,
@@ -211,6 +212,41 @@ describe('LeisurePlanService.create', () => {
     );
     expect(repository.create).not.toHaveBeenCalled();
   });
+
+  it('derives `date` as the earliest customDates entry for a "custom" recurrence', async () => {
+    const repository = buildRepository();
+    const service = buildService(repository);
+    const user = buildAuthenticatedUser({ id: 'user-1' });
+    const input = {
+      title: 'Personalizado',
+      date: '2099-01-20',
+      recurrence: 'custom' as const,
+      customDates: ['2099-01-20', '2099-01-05', '2099-01-15'],
+    };
+
+    await service.create(user, input);
+
+    expect(repository.create).toHaveBeenCalledWith(user.accessToken, 'user-1', {
+      ...input,
+      date: '2099-01-05',
+    });
+  });
+
+  it('rejects a custom entry with a past date among customDates', async () => {
+    const repository = buildRepository();
+    const service = buildService(repository);
+    const input = {
+      title: 'Personalizado',
+      date: '2099-01-20',
+      recurrence: 'custom' as const,
+      customDates: ['2099-01-20', '2000-01-01'],
+    };
+
+    await expect(service.create(buildAuthenticatedUser(), input)).rejects.toBeInstanceOf(
+      LeisurePlanEntryDateInvalidError,
+    );
+    expect(repository.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('LeisurePlanService.update', () => {
@@ -275,6 +311,42 @@ describe('LeisurePlanService.update', () => {
       date: '2000-01-01',
       notes: 'Updated notes',
     });
+  });
+
+  it('re-derives `date` when customDates changes on an existing "custom" entry', async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'custom', date: '2026-01-01', customDates: ['2026-01-01'] }),
+        ),
+    });
+    const service = buildService(repository);
+
+    await service.update(buildAuthenticatedUser(), 'plan-1', {
+      customDates: ['2099-01-20', '2099-01-05'],
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(expect.any(String), 'plan-1', {
+      customDates: ['2099-01-20', '2099-01-05'],
+      date: '2099-01-05',
+    });
+  });
+
+  it('rejects adding a past date to an existing "custom" entry', async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'custom', date: '2026-01-01', customDates: ['2026-01-01'] }),
+        ),
+    });
+    const service = buildService(repository);
+
+    await expect(
+      service.update(buildAuthenticatedUser(), 'plan-1', { customDates: ['2000-01-01'] }),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryDateInvalidError);
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it('rejects rescheduling an entry to a new past date', async () => {
@@ -462,6 +534,48 @@ describe('LeisurePlanService.complete', () => {
       TODAY,
     );
     expect(result.occurrenceDate).toBe(TODAY);
+  });
+
+  it('records a per-occurrence completion for a custom entry, leaving other marked dates untouched', async () => {
+    const repository = buildRepository({
+      findById: vi.fn().mockResolvedValue(
+        buildEntry({
+          recurrence: 'custom',
+          date: '2026-01-01',
+          customDates: ['2026-01-01', TODAY],
+        }),
+      ),
+    });
+    const service = buildService(repository);
+    const user = buildAuthenticatedUser({ id: 'user-1' });
+
+    const result = await service.complete(user, 'plan-1', TODAY);
+
+    expect(repository.markOccurrenceCompleted).toHaveBeenCalledWith(
+      user.accessToken,
+      'user-1',
+      'plan-1',
+      TODAY,
+    );
+    expect(repository.update).not.toHaveBeenCalled();
+    expect(result.occurrenceDate).toBe(TODAY);
+    expect(result.completed).toBe(true);
+  });
+
+  it('rejects completing a custom occurrence whose date is not today', async () => {
+    const repository = buildRepository({
+      findById: vi
+        .fn()
+        .mockResolvedValue(
+          buildEntry({ recurrence: 'custom', date: '2026-01-01', customDates: ['2026-01-01'] }),
+        ),
+    });
+    const service = buildService(repository);
+
+    await expect(
+      service.complete(buildAuthenticatedUser(), 'plan-1', '2000-01-01'),
+    ).rejects.toBeInstanceOf(LeisurePlanEntryCompletionNotTodayError);
+    expect(repository.markOccurrenceCompleted).not.toHaveBeenCalled();
   });
 
   it('rejects completing a daily/weekly occurrence whose date is not today', async () => {

@@ -85,6 +85,64 @@ describe('createPlanEntrySchema', () => {
   });
 });
 
+describe('createPlanEntrySchema — recurrence "custom"', () => {
+  const future = { date: '2099-01-01', ...validPlanEntryTimes, recurrence: 'custom' as const };
+
+  it('accepts a custom entry with one or more future dates', () => {
+    const result = createPlanEntrySchema.safeParse({
+      title: 'Personalizado',
+      ...future,
+      customDates: ['2099-01-03', '2099-01-07'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a custom entry with no customDates at all', () => {
+    const result = createPlanEntrySchema.safeParse({ title: 'Personalizado', ...future });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]!.path).toEqual(['customDates']);
+    }
+  });
+
+  it('rejects a custom entry with an empty customDates array', () => {
+    const result = createPlanEntrySchema.safeParse({
+      title: 'Personalizado',
+      ...future,
+      customDates: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a custom entry with a past date in customDates', () => {
+    const result = createPlanEntrySchema.safeParse({
+      title: 'Personalizado',
+      ...future,
+      customDates: ['2020-01-01'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a malformed date inside customDates', () => {
+    const result = createPlanEntrySchema.safeParse({
+      title: 'Personalizado',
+      ...future,
+      customDates: ['01/01/2099'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('does not require customDates for other recurrences', () => {
+    const result = createPlanEntrySchema.safeParse({
+      title: 'Diário',
+      date: '2099-01-01',
+      ...validPlanEntryTimes,
+      recurrence: 'daily',
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('updatePlanEntrySchema', () => {
   it('allows an empty patch', () => {
     expect(updatePlanEntrySchema.safeParse({}).success).toBe(true);
@@ -93,6 +151,19 @@ describe('updatePlanEntrySchema', () => {
   it('allows a partial patch with just completed', () => {
     const result = updatePlanEntrySchema.safeParse({ completed: true });
     expect(result.success).toBe(true);
+  });
+
+  it('allows a patch that sets recurrence to "custom" alongside customDates', () => {
+    const result = updatePlanEntrySchema.safeParse({
+      recurrence: 'custom',
+      customDates: ['2099-01-03'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a patch that sets recurrence to "custom" without customDates', () => {
+    const result = updatePlanEntrySchema.safeParse({ recurrence: 'custom' });
+    expect(result.success).toBe(false);
   });
 });
 

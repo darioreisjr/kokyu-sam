@@ -43,9 +43,12 @@ function firstOccurrenceOnOrAfter(anchor: string, start: string, stepDays: numbe
  * A `recurrence: 'daily'`/`'weekly'` row represents the whole series -
  * one row, `date` as its anchor/start - repeating every day (or every 7
  * days) forever after that, per the feature request: "a partir da data
- * que foi cadastrada, em diante, todo dia". `'none'` rows (and
- * `'custom'`, which has no interval captured anywhere in the data model
- * yet) only ever occur on their own `date`, exactly as before.
+ * que foi cadastrada, em diante, todo dia". A `'custom'` row also
+ * represents a whole series, but its days are an explicit set
+ * (`customDates`) rather than a computable step - `date` is kept in sync
+ * as the earliest of that set (see `LeisurePlanService`/repository), so
+ * it still sorts and filters like every other row. `'none'` rows only
+ * ever occur on their own `date`.
  *
  * Each returned entry keeps `date` as the series' anchor (so editing an
  * occurrence still edits the true start date, never silently reschedules
@@ -53,9 +56,10 @@ function firstOccurrenceOnOrAfter(anchor: string, start: string, stepDays: numbe
  * on - which callers should group/display by instead.
  *
  * `completedOccurrences` (keys from `occurrenceCompletionKey`) is the
- * only source of truth for a recurring row's per-day `completed`; a
- * `'none'`/`'custom'` row keeps using its own `completed` column,
- * untouched by this table.
+ * only source of truth for a recurring row's per-day `completed`,
+ * including `'custom'` now (each marked date completes independently,
+ * same as daily/weekly); a `'none'` row keeps using its own `completed`
+ * column, untouched by this table.
  */
 export function expandPlanEntriesForRange(
   entries: LeisurePlanEntry[],
@@ -78,6 +82,16 @@ export function expandPlanEntriesForRange(
           occurrenceDate,
           completed: completedOccurrences.has(occurrenceCompletionKey(entry.id, occurrenceDate)),
         });
+      }
+    } else if (entry.recurrence === 'custom' && entry.customDates) {
+      for (const occurrenceDate of entry.customDates) {
+        if (occurrenceDate >= startDate && occurrenceDate <= endDate) {
+          occurrences.push({
+            ...entry,
+            occurrenceDate,
+            completed: completedOccurrences.has(occurrenceCompletionKey(entry.id, occurrenceDate)),
+          });
+        }
       }
     } else if (entry.date >= startDate && entry.date <= endDate) {
       occurrences.push({ ...entry, occurrenceDate: entry.date });

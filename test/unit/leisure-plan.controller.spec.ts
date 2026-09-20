@@ -16,6 +16,7 @@ function buildEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisurePlanEntry
     endTime: null,
     duration: 120,
     recurrence: 'none',
+    customDates: null,
     notes: null,
     reminder: false,
     completed: false,

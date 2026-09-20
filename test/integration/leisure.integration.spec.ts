@@ -422,6 +422,58 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
     );
   });
 
+  it('custom plan entry: appears only on its explicit dates, and completing one date never affects the others', async () => {
+    const { accessToken } = await createConfirmedUser();
+    const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
+    const toDateKey = (date: Date) => date.toISOString().slice(0, 10);
+    // Same "anchor at the very end of today" trick as the daily test above,
+    // so the picked dates stay in the future relative to "now" at creation
+    // time while still letting the test complete the first one today.
+    const today = toDateKey(new Date());
+    const day3 = toDateKey(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
+    const day7 = toDateKey(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
+
+    const created = await auth(request(server()).post('/api/v1/leisure/plan')).send({
+      title: 'Sessão de jogos',
+      date: today,
+      recurrence: 'custom',
+      customDates: [day3, today, day7],
+      startTime: '23:58',
+      endTime: '23:59',
+      duration: 30,
+    });
+    expect(created.status).toBe(201);
+    const entry = created.body as PlanEntryBody;
+    // `date` (the series' anchor) is always the earliest of customDates,
+    // regardless of the order they were sent in.
+    expect((created.body as { date: string }).date).toBe(today);
+
+    const listed = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${today}&endDate=${day7}`),
+    );
+    expect(listed.status).toBe(200);
+    const occurrences = (listed.body as PlanEntryBody[])
+      .filter((e) => e.id === entry.id)
+      .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
+    expect(occurrences.map((e) => e.occurrenceDate)).toEqual([today, day3, day7]);
+    expect(occurrences.every((e) => e.completed === false)).toBe(true);
+
+    const completed = await auth(
+      request(server()).post(`/api/v1/leisure/plan/${entry.id}/complete`),
+    ).send({ date: today });
+    expect(completed.status).toBe(201);
+    expect((completed.body as PlanEntryBody).occurrenceDate).toBe(today);
+    expect((completed.body as PlanEntryBody).completed).toBe(true);
+
+    const listedAfter = await auth(
+      request(server()).get(`/api/v1/leisure/plan?startDate=${today}&endDate=${day7}`),
+    );
+    const occurrencesAfter = (listedAfter.body as PlanEntryBody[])
+      .filter((e) => e.id === entry.id)
+      .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate));
+    expect(occurrencesAfter.map((e) => e.completed)).toEqual([true, false, false]);
+  });
+
   it('rejects completing a plan entry/occurrence whose date is not today', async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);

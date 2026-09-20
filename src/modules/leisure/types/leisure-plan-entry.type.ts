@@ -20,6 +20,8 @@ export interface LeisurePlanEntry {
   endTime: string | null;
   duration: number | null;
   recurrence: LeisureRecurrence;
+  /** Explicit set of calendar days for a `recurrence: 'custom'` entry - null for `none`/`daily`/`weekly`. See `expandPlanEntriesForRange`. */
+  customDates: string[] | null;
   notes: string | null;
   reminder: boolean;
   /** For `'daily'`/`'weekly'`, reflects `occurrenceDate` specifically (from `leisure_plan_entry_completions`), never the whole series. */
@@ -39,6 +41,7 @@ export interface LeisurePlanEntryCreateInput {
   endTime?: string | null;
   duration?: number | null;
   recurrence?: LeisureRecurrence;
+  customDates?: string[] | null;
   notes?: string | null;
   reminder?: boolean;
   completed?: boolean;

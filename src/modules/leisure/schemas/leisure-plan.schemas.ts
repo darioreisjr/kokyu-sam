@@ -36,10 +36,45 @@ const planEntrySharedFieldsSchema = {
   title: z.string().trim().min(1, 'title is required.').max(200),
   date: dateSchema,
   recurrence: z.enum(LEISURE_RECURRENCES).optional(),
+  customDates: z.array(dateSchema).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   reminder: z.boolean().optional(),
   completed: z.boolean().optional(),
 };
+
+/**
+ * `recurrence: 'custom'` has no computable pattern (unlike daily/weekly's
+ * step), so it needs its own explicit, non-empty set of days - and every
+ * day in that set must be today or later, same "not in the past" rule
+ * `date` itself is held to elsewhere (see `findPastPlanEntryViolation`).
+ */
+function requireCustomDatesWhenCustomRecurrence(
+  data: { recurrence?: (typeof LEISURE_RECURRENCES)[number]; customDates?: string[] | null },
+  ctx: z.RefinementCtx,
+) {
+  if (data.recurrence !== 'custom') return;
+
+  if (!data.customDates || data.customDates.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['customDates'],
+      message: 'customDates must have at least one date when recurrence is "custom".',
+    });
+    return;
+  }
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  for (const day of data.customDates) {
+    if (day < todayKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customDates'],
+        message: 'customDates cannot contain a date in the past.',
+      });
+      return;
+    }
+  }
+}
 
 // `startTime`/`endTime`/`duration` are the only fields that differ between
 // create and update: creation requires all three (only `notes` stays
@@ -61,9 +96,18 @@ const updatePlanEntryFieldsSchema = z.object({
   duration: nullableDurationSchema(),
 });
 
-export const createPlanEntrySchema = createPlanEntryFieldsSchema.strict();
+export const createPlanEntrySchema = createPlanEntryFieldsSchema
+  .strict()
+  .superRefine(requireCustomDatesWhenCustomRecurrence);
 
-export const updatePlanEntrySchema = updatePlanEntryFieldsSchema.partial().strict();
+// `.partial()` before `.strict()` so an update payload that omits
+// `recurrence` entirely (most PATCHes) never gets forced into the
+// "must supply customDates" rule below - only a PATCH that actually sets
+// `recurrence: 'custom'` is held to it.
+export const updatePlanEntrySchema = updatePlanEntryFieldsSchema
+  .partial()
+  .strict()
+  .superRefine(requireCustomDatesWhenCustomRecurrence);
 
 export const listPlanQuerySchema = z
   .object({

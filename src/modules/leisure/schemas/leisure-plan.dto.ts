@@ -31,6 +31,14 @@ export class LeisurePlanEntryDto {
   @ApiProperty()
   recurrence!: string;
 
+  @ApiProperty({
+    type: [String],
+    nullable: true,
+    description:
+      "Explicit set of YYYY-MM-DD days for a `recurrence: 'custom'` entry. Null for none/daily/weekly.",
+  })
+  customDates!: string[] | null;
+
   @ApiProperty({ nullable: true })
   notes!: string | null;
 

@@ -6,7 +6,11 @@ import {
   LeisurePlanEntryDateInvalidError,
   LeisurePlanEntryNotFoundError,
 } from '../../common/errors/app.error';
-import { findPastPlanEntryViolation, isTodayKey } from './leisure-plan-date.util';
+import {
+  findPastPlanEntryViolation,
+  isTodayKey,
+  withCustomDatesAnchor,
+} from './leisure-plan-date.util';
 import { expandPlanEntriesForRange } from './leisure-plan-recurrence.util';
 import {
   LeisurePlanEntry,
@@ -64,12 +68,16 @@ export class LeisurePlanService {
     user: AuthenticatedUser,
     input: LeisurePlanEntryCreateInput,
   ): Promise<LeisurePlanEntry> {
+    // A `'custom'` series' anchor is never trusted from the caller — see
+    // `withCustomDatesAnchor`.
+    const normalizedInput = withCustomDatesAnchor(input);
+
     // No reference entry yet, so every field is a fresh pick — see
     // `findPastPlanEntryViolation`.
-    const violation = findPastPlanEntryViolation(input);
+    const violation = findPastPlanEntryViolation(normalizedInput);
     if (violation) throw new LeisurePlanEntryDateInvalidError(violation.message);
 
-    return this.repository.create(user.accessToken, user.id, input);
+    return this.repository.create(user.accessToken, user.id, normalizedInput);
   }
 
   /**
@@ -88,14 +96,26 @@ export class LeisurePlanService {
     if (!existing) throw new LeisurePlanEntryNotFoundError();
     if (existing.archived) throw new LeisurePlanEntryArchivedError();
 
-    // Only a patch that actually touches date/startTime/endTime needs the
-    // past-date check — e.g. `complete()`'s `{ completed: true }` never does.
-    if (patch.date !== undefined || patch.startTime !== undefined || patch.endTime !== undefined) {
-      const violation = findPastPlanEntryViolation(patch, existing);
+    // A `'custom'` series' anchor is never trusted from the caller — see
+    // `withCustomDatesAnchor`. Falls back to the existing recurrence when
+    // this patch doesn't touch it (e.g. only adding a date to an already
+    // `'custom'` entry).
+    const normalizedPatch = withCustomDatesAnchor(patch, existing.recurrence);
+
+    // Only a patch that actually touches date/startTime/endTime/customDates
+    // needs the past-date check — e.g. `complete()`'s `{ completed: true }`
+    // never does.
+    if (
+      normalizedPatch.date !== undefined ||
+      normalizedPatch.startTime !== undefined ||
+      normalizedPatch.endTime !== undefined ||
+      normalizedPatch.customDates !== undefined
+    ) {
+      const violation = findPastPlanEntryViolation(normalizedPatch, existing);
       if (violation) throw new LeisurePlanEntryDateInvalidError(violation.message);
     }
 
-    const updated = await this.repository.update(user.accessToken, id, patch);
+    const updated = await this.repository.update(user.accessToken, id, normalizedPatch);
     if (!updated) throw new LeisurePlanEntryNotFoundError();
     return updated;
   }
@@ -135,12 +155,11 @@ export class LeisurePlanService {
   }
 
   /**
-   * `occurrenceDate` picks which day of a `'daily'`/`'weekly'` series is
-   * being completed (defaults to the series' own anchor date) - recorded
-   * in `leisure_plan_entry_completions` so it never affects any other
-   * day. A `'none'`/`'custom'` entry has only ever had one day, so it
-   * keeps going through `update()`'s `completed` column exactly as
-   * before.
+   * `occurrenceDate` picks which day of a `'daily'`/`'weekly'`/`'custom'`
+   * series is being completed (defaults to the series' own anchor date) -
+   * recorded in `leisure_plan_entry_completions` so it never affects any
+   * other day. A `'none'` entry has only ever had one day, so it keeps
+   * going through `update()`'s `completed` column exactly as before.
    *
    * Either path also appends a `leisure_log_entries` row, but only the
    * first time a given occurrence/entry is completed - re-completing (a
@@ -149,7 +168,7 @@ export class LeisurePlanService {
    *
    * An entry/occurrence can only be completed on its own scheduled day
    * (`isTodayKey`) - defense in depth for the frontend's "Concluir" button
-   * being hidden otherwise. For `'none'`/`'custom'`, the already-completed
+   * being hidden otherwise. For `'none'`, the already-completed
    * short-circuit stays ahead of that check: re-hitting complete on an
    * already-completed entry must stay a harmless no-op no matter what day
    * it now is, since only a genuine first-time completion is gated.
@@ -167,7 +186,11 @@ export class LeisurePlanService {
     if (!existing) throw new LeisurePlanEntryNotFoundError();
     if (existing.archived) throw new LeisurePlanEntryArchivedError();
 
-    if (existing.recurrence === 'daily' || existing.recurrence === 'weekly') {
+    if (
+      existing.recurrence === 'daily' ||
+      existing.recurrence === 'weekly' ||
+      existing.recurrence === 'custom'
+    ) {
       const date = occurrenceDate ?? existing.date;
       if (!isTodayKey(date)) throw new LeisurePlanEntryCompletionNotTodayError();
 

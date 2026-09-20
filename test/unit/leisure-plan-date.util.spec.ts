@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findPastPlanEntryViolation,
   isTodayKey,
+  withCustomDatesAnchor,
 } from '../../src/modules/leisure/leisure-plan-date.util';
 
 const NOW = new Date('2026-06-15T14:30:00.000Z');
@@ -136,6 +137,90 @@ describe('findPastPlanEntryViolation — update (with reference)', () => {
       NOW,
     );
     expect(violation?.field).toBe('startTime');
+  });
+});
+
+describe('findPastPlanEntryViolation — customDates', () => {
+  it('accepts a create with only future customDates', () => {
+    expect(
+      findPastPlanEntryViolation(
+        { date: '2026-06-16', customDates: ['2026-06-16', '2026-06-20'] },
+        undefined,
+        NOW,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects a create with a past date among customDates', () => {
+    const violation = findPastPlanEntryViolation(
+      { date: '2026-06-16', customDates: ['2026-06-16', '2026-06-01'] },
+      undefined,
+      NOW,
+    );
+    expect(violation?.field).toBe('customDates');
+  });
+
+  it('allows keeping an already-past customDate unchanged on update', () => {
+    const reference = { date: '2020-01-01', customDates: ['2020-01-01'] };
+    const violation = findPastPlanEntryViolation({ customDates: ['2020-01-01'] }, reference, NOW);
+    expect(violation).toBeNull();
+  });
+
+  it('rejects adding a new past customDate on update, even alongside an unchanged past one', () => {
+    const reference = { date: '2020-01-01', customDates: ['2020-01-01'] };
+    const violation = findPastPlanEntryViolation(
+      { customDates: ['2020-01-01', '2020-02-01'] },
+      reference,
+      NOW,
+    );
+    expect(violation?.field).toBe('customDates');
+  });
+
+  it('accepts adding a new future customDate on update', () => {
+    const reference = { date: '2020-01-01', customDates: ['2020-01-01'] };
+    const violation = findPastPlanEntryViolation(
+      { customDates: ['2020-01-01', '2026-07-01'] },
+      reference,
+      NOW,
+    );
+    expect(violation).toBeNull();
+  });
+});
+
+describe('withCustomDatesAnchor', () => {
+  it('sets `date` to the earliest customDates entry for a "custom" recurrence', () => {
+    const result = withCustomDatesAnchor({
+      recurrence: 'custom',
+      customDates: ['2026-06-20', '2026-06-05', '2026-06-15'],
+      date: '2026-06-20',
+    });
+    expect(result.date).toBe('2026-06-05');
+  });
+
+  it('leaves `date` untouched for a non-"custom" recurrence', () => {
+    const result = withCustomDatesAnchor({
+      recurrence: 'daily',
+      customDates: ['2026-06-20'],
+      date: '2026-06-01',
+    });
+    expect(result.date).toBe('2026-06-01');
+  });
+
+  it('leaves the input untouched when customDates is absent or empty', () => {
+    expect(withCustomDatesAnchor({ recurrence: 'custom', date: '2026-06-01' }).date).toBe(
+      '2026-06-01',
+    );
+    expect(
+      withCustomDatesAnchor({ recurrence: 'custom', customDates: [], date: '2026-06-01' }).date,
+    ).toBe('2026-06-01');
+  });
+
+  it('falls back to the provided recurrence when the input omits it (PATCH case)', () => {
+    const result = withCustomDatesAnchor(
+      { customDates: ['2026-06-20', '2026-06-05'], date: '2026-06-20' },
+      'custom',
+    );
+    expect(result.date).toBe('2026-06-05');
   });
 });
 

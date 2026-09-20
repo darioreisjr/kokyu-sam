@@ -13,6 +13,7 @@ function buildPlanRow(overrides: Record<string, unknown> = {}) {
     end_time: null,
     duration: 120,
     recurrence: 'none',
+    custom_dates: null,
     notes: null,
     reminder: false,
     completed: false,
@@ -35,6 +36,7 @@ function buildExpectedEntry(overrides: Partial<LeisurePlanEntry> = {}): LeisureP
     endTime: null,
     duration: 120,
     recurrence: 'none',
+    customDates: null,
     notes: null,
     reminder: false,
     completed: false,
@@ -277,6 +279,32 @@ describe('SupabaseLeisurePlanRepository.create', () => {
     );
     expect(entry).toEqual(buildExpectedEntry());
   });
+
+  it('inserts custom_dates when the entry is a "custom" series', async () => {
+    const single = vi.fn(() =>
+      Promise.resolve({
+        data: buildPlanRow({ recurrence: 'custom', custom_dates: ['2026-02-01', '2026-02-05'] }),
+        error: null,
+      }),
+    );
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    const repository = buildRepository({ from: () => ({ insert }) });
+
+    const entry = await repository.create('token', 'user-1', {
+      title: 'Personalizado',
+      date: '2026-02-01',
+      startTime: '19:00',
+      duration: 60,
+      recurrence: 'custom',
+      customDates: ['2026-02-01', '2026-02-05'],
+    });
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ recurrence: 'custom', custom_dates: ['2026-02-01', '2026-02-05'] }),
+    );
+    expect(entry.customDates).toEqual(['2026-02-01', '2026-02-05']);
+  });
 });
 
 describe('SupabaseLeisurePlanRepository.update', () => {
@@ -293,6 +321,30 @@ describe('SupabaseLeisurePlanRepository.update', () => {
 
     expect(update).toHaveBeenCalledWith({ completed: true });
     expect(entry?.completed).toBe(true);
+  });
+
+  it('maps customDates to the custom_dates column when present in the patch', async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({
+        data: buildPlanRow({ recurrence: 'custom', custom_dates: ['2026-02-01', '2026-02-05'] }),
+        error: null,
+      }),
+    );
+    const select = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const repository = buildRepository({ from: () => ({ update }) });
+
+    const entry = await repository.update('token', 'plan-1', {
+      recurrence: 'custom',
+      customDates: ['2026-02-01', '2026-02-05'],
+    });
+
+    expect(update).toHaveBeenCalledWith({
+      recurrence: 'custom',
+      custom_dates: ['2026-02-01', '2026-02-05'],
+    });
+    expect(entry?.customDates).toEqual(['2026-02-01', '2026-02-05']);
   });
 
   it('returns null when no row matched', async () => {
