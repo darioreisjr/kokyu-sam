@@ -45,8 +45,8 @@ importers:
         specifier: ^10.0.0
         version: 10.5.0
       pino-pretty:
-        specifier: ^11.0.0
-        version: 11.3.0
+        specifier: ^13.1.3
+        version: 13.1.3
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -2008,8 +2008,8 @@ packages:
     resolution: {integrity: sha512-yblEwXAbGv1VQDmow7s38W77hzAgJAO50ztBLMcUyUBfxv1HC+LGwtiEN+Co6LtlqT/5uwVOxsD4TNIilWhwdQ==}
     engines: {node: '>=4'}
 
-  fast-copy@3.1.0:
-    resolution: {integrity: sha512-IuCOCDFM1F/s4LtG7Bjr3yUUwPHybyhqN74xk2cMYoP51vVeErMy8+6HGFchi/+45lW8uzhs6lBeEqks2GWt6A==}
+  fast-copy@4.1.1:
+    resolution: {integrity: sha512-A4QTJmuiztpGtr6AMeJts9R4hbj2ZBUwtOaKrG6rw2y7t6+IaJKjz5M3XDs8BUznxDH43FVc6A0y/gWlMl4UtA==}
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
@@ -2734,11 +2734,14 @@ packages:
   pino-abstract-transport@2.0.0:
     resolution: {integrity: sha512-F63x5tizV6WCh4R6RHyi2Ml+M70DNRXt/+HANowMflpgGFMAym/VKm6G7ZOQRjqN7XbGxK1Lg9t6ZrtzOaivMw==}
 
+  pino-abstract-transport@3.0.0:
+    resolution: {integrity: sha512-wlfUczU+n7Hy/Ha5j9a/gZNy7We5+cXp8YL+X+PG8S0KXxw7n/JXA3c46Y0zQznIJ83URJiwy7Lh56WLokNuxg==}
+
   pino-http@10.5.0:
     resolution: {integrity: sha512-hD91XjgaKkSsdn8P7LaebrNzhGTdB086W3pyPihX0EzGPjq5uBJBXo4N5guqNaK6mUjg9aubMF7wDViYek9dRA==}
 
-  pino-pretty@11.3.0:
-    resolution: {integrity: sha512-oXwn7ICywaZPHmu3epHGU2oJX4nPmKvHvB/bwrJHlGcbEWaVcotkpyVHMKLKmiVryWYByNp0jpgAcXpFJDXJzA==}
+  pino-pretty@13.1.3:
+    resolution: {integrity: sha512-ttXRkkOz6WWC95KeY9+xxWL6AtImwbyMHrL1mSwqwW9u+vLp/WIElvHvCSDg0xO/Dzrggz1zv3rN5ovTRVowKg==}
     hasBin: true
 
   pino-std-serializers@7.1.0:
@@ -2892,8 +2895,8 @@ packages:
     resolution: {integrity: sha512-eflK8wEtyOE6+hsaRVPxvUKYCpRgzLqDTb8krvAsRIwOGlHoSgYLgBXoubGgLd2fT41/OUYdb48v4k4WWHQurA==}
     engines: {node: '>= 10.13.0'}
 
-  secure-json-parse@2.7.0:
-    resolution: {integrity: sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==}
+  secure-json-parse@4.1.0:
+    resolution: {integrity: sha512-l4KnYfEyqYJxDwlNVyRfO2E4NTHfMKAWdUuA8J0yve2Dz/E/PdBepY03RvyJpssIpRFwJoCD55wA+mEDs6ByWA==}
 
   semver-regex@4.0.5:
     resolution: {integrity: sha512-hunMQrEy1T6Jr2uEVjrAIqjwWcQTgOAcIM52C8MY1EZSD3DDNft04XzvYKPqjED65bNVVko0YI38nYeEHCX3yw==}
@@ -3051,6 +3054,10 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
+
+  strip-json-comments@5.0.3:
+    resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
+    engines: {node: '>=14.16'}
 
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
@@ -5292,7 +5299,7 @@ snapshots:
       ext-list: 2.2.2
       sort-keys-length: 1.0.1
 
-  fast-copy@3.1.0: {}
+  fast-copy@4.1.1: {}
 
   fast-deep-equal@3.1.3: {}
 
@@ -5951,6 +5958,10 @@ snapshots:
     dependencies:
       split2: 4.2.0
 
+  pino-abstract-transport@3.0.0:
+    dependencies:
+      split2: 4.2.0
+
   pino-http@10.5.0:
     dependencies:
       get-caller-file: 2.0.5
@@ -5958,22 +5969,21 @@ snapshots:
       pino-std-serializers: 7.1.0
       process-warning: 5.1.0
 
-  pino-pretty@11.3.0:
+  pino-pretty@13.1.3:
     dependencies:
       colorette: 2.0.20
       dateformat: 4.6.3
-      fast-copy: 3.1.0
+      fast-copy: 4.1.1
       fast-safe-stringify: 2.1.1
       help-me: 5.0.0
       joycon: 3.1.1
       minimist: 1.2.8
       on-exit-leak-free: 2.1.2
-      pino-abstract-transport: 2.0.0
+      pino-abstract-transport: 3.0.0
       pump: 3.0.4
-      readable-stream: 4.7.0
-      secure-json-parse: 2.7.0
+      secure-json-parse: 4.1.0
       sonic-boom: 4.2.1
-      strip-json-comments: 3.1.1
+      strip-json-comments: 5.0.3
 
   pino-std-serializers@7.1.0: {}
 
@@ -6159,7 +6169,7 @@ snapshots:
       ajv-formats: 2.1.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
 
-  secure-json-parse@2.7.0: {}
+  secure-json-parse@4.1.0: {}
 
   semver-regex@4.0.5: {}
 
@@ -6312,6 +6322,8 @@ snapshots:
   strip-final-newline@2.0.0: {}
 
   strip-json-comments@3.1.1: {}
+
+  strip-json-comments@5.0.3: {}
 
   strip-literal@3.1.0:
     dependencies:
