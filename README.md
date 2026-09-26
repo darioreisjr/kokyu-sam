@@ -46,23 +46,23 @@ Ver [.env.example](.env.example). Validação fail-fast via Zod em [src/config/e
 
 ## Scripts
 
-| Script | Descrição |
-| --- | --- |
-| `pnpm dev` | API em modo watch |
-| `pnpm build` | Build de produção (SWC) |
-| `pnpm start` / `pnpm start:prod` | Roda o build compilado |
-| `pnpm lint` / `pnpm lint:fix` | ESLint |
-| `pnpm format` / `pnpm format:check` | Prettier |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | Testes unitários (Vitest) |
-| `pnpm test:coverage` | Testes unitários com cobertura (V8) |
-| `pnpm test:integration` | Testes contra Supabase local real |
-| `pnpm test:e2e` | Testes Supertest contra a app Nest completa |
-| `pnpm check` | lint + typecheck + test + build |
-| `pnpm db:start` / `db:stop` / `db:reset` | Ciclo de vida do Supabase local |
-| `pnpm db:migrate` | Aplica migrations pendentes |
-| `pnpm db:types` | Regenera `src/infrastructure/supabase/database.types.ts` |
-| `pnpm db:lint` | Lint do schema SQL |
+| Script                                   | Descrição                                                |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `pnpm dev`                               | API em modo watch                                        |
+| `pnpm build`                             | Build de produção (SWC)                                  |
+| `pnpm start` / `pnpm start:prod`         | Roda o build compilado                                   |
+| `pnpm lint` / `pnpm lint:fix`            | ESLint                                                   |
+| `pnpm format` / `pnpm format:check`      | Prettier                                                 |
+| `pnpm typecheck`                         | `tsc --noEmit`                                           |
+| `pnpm test`                              | Testes unitários (Vitest)                                |
+| `pnpm test:coverage`                     | Testes unitários com cobertura (V8)                      |
+| `pnpm test:integration`                  | Testes contra Supabase local real                        |
+| `pnpm test:e2e`                          | Testes Supertest contra a app Nest completa              |
+| `pnpm check`                             | lint + typecheck + test + build                          |
+| `pnpm db:start` / `db:stop` / `db:reset` | Ciclo de vida do Supabase local                          |
+| `pnpm db:migrate`                        | Aplica migrations pendentes                              |
+| `pnpm db:types`                          | Regenera `src/infrastructure/supabase/database.types.ts` |
+| `pnpm db:lint`                           | Lint do schema SQL                                       |
 
 ## Docker
 
@@ -72,6 +72,10 @@ docker compose up
 ```
 
 Veja [docs/deployment.md](docs/deployment.md) para detalhes de runtime, non-root user e limitações.
+
+## Branches
+
+`develop` (desenvolvimento, Supabase de staging) é a branch padrão e a base de toda branch nova; `main` (produção) só recebe releases vindas da `develop`. Detalhes em [docs/deployment.md](docs/deployment.md#branches).
 
 ## Documentação
 
