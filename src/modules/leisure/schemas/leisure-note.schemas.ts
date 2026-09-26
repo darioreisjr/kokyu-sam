@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LEISURE_NOTE_TYPES } from '../constants/leisure-enums.constant';
+import { tagSchema, tagsSchema } from './leisure-tags.schema';
 
 const checklistItemSchema = z
   .object({
@@ -22,7 +23,7 @@ const noteFieldsSchema = z.object({
   type: z.enum(LEISURE_NOTE_TYPES),
   checklistItems: z.array(checklistItemSchema).max(100).nullable().optional(),
   linkUrl: z.string().trim().url().max(2048).nullable().optional(),
-  tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
+  tags: tagsSchema.optional(),
   pinned: z.boolean().optional(),
   archived: z.boolean().optional(),
   reminderDate: z.string().trim().datetime({ offset: true }).nullable().optional(),
@@ -42,7 +43,7 @@ export const listNotesQuerySchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((value) => (value === undefined ? undefined : value === 'true')),
-    tag: z.string().trim().min(1).max(40).optional(),
+    tag: tagSchema.optional(),
     relatedItemId: z.string().uuid().optional(),
   })
   .strict();

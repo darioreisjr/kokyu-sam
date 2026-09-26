@@ -8,11 +8,12 @@ import {
 } from '../constants/leisure-enums.constant';
 import { LeisureItemCreateInput, LeisureItemUpdateInput } from '../types/leisure-item.type';
 import { LEISURE_ITEM_DETAILS_SCHEMAS } from './leisure-item-details.schemas';
+import { tagSchema, tagsSchema as normalizedTagsSchema } from './leisure-tags.schema';
 
 const titleSchema = z.string().trim().min(1, 'title is required.').max(200);
 const descriptionSchema = z.string().trim().max(2000).nullable().optional();
 const coverImageSchema = z.string().trim().url().max(2048).nullable().optional();
-const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(30).default([]);
+const tagsSchema = normalizedTagsSchema.default([]);
 const sourceSchema = z.string().trim().max(200).nullable().optional();
 const sourceUrlSchema = z.string().trim().url().max(2048).nullable().optional();
 const recommendedBySchema = z.string().trim().max(120).nullable().optional();
@@ -90,7 +91,7 @@ export const listLeisureItemsQuerySchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((value) => (value === undefined ? undefined : value === 'true')),
-    tag: z.string().trim().min(1).max(40).optional(),
+    tag: tagSchema.optional(),
     search: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
