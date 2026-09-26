@@ -13,7 +13,11 @@ import { tagSchema, tagsSchema as normalizedTagsSchema } from './leisure-tags.sc
 const titleSchema = z.string().trim().min(1, 'title is required.').max(200);
 const descriptionSchema = z.string().trim().max(2000).nullable().optional();
 const coverImageSchema = z.string().trim().url().max(2048).nullable().optional();
-const tagsSchema = normalizedTagsSchema.default([]);
+// No `.default([])` here: this schema is shared with the PATCH schema, and
+// zod 4 applies a default even inside `.optional()` - a PATCH without
+// `tags` would then clear them. The create path defaults to [] itself
+// (see toCreateInput).
+const tagsSchema = normalizedTagsSchema;
 const sourceSchema = z.string().trim().max(200).nullable().optional();
 const sourceUrlSchema = z.string().trim().url().max(2048).nullable().optional();
 const recommendedBySchema = z.string().trim().max(120).nullable().optional();
@@ -72,7 +76,7 @@ const COVER_MIME_TO_EXTENSION: Record<(typeof COVER_MIME_TYPES)[number], string>
 export const coverUploadUrlSchema = z
   .object({
     contentType: z.enum(COVER_MIME_TYPES, {
-      errorMap: () => ({ message: 'contentType must be image/png, image/jpeg or image/webp.' }),
+      error: 'contentType must be image/png, image/jpeg or image/webp.',
     }),
   })
   .strict();
@@ -89,8 +93,8 @@ export const listLeisureItemsQuerySchema = z
     status: z.enum(LEISURE_ITEM_STATUSES).optional(),
     favorite: z
       .enum(['true', 'false'])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === 'true')),
+      .transform((value) => value === 'true')
+      .optional(),
     tag: tagSchema.optional(),
     search: z.string().trim().min(1).max(120).optional(),
   })

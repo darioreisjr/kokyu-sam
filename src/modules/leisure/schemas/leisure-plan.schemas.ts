@@ -16,7 +16,9 @@ function nullableTimeSchema() {
 /** Required (non-null) for `createPlanEntrySchema` - see `fieldName` for the "is required." message. */
 function requiredTimeSchema(fieldName: string) {
   return z
-    .string({ required_error: `${fieldName} is required.` })
+    .string({
+      error: (issue) => (issue.input === undefined ? `${fieldName} is required.` : undefined),
+    })
     .trim()
     .regex(timeRegex, 'Must be an HH:mm time.');
 }
@@ -28,11 +30,17 @@ function nullableDurationSchema() {
 
 /** Required for `createPlanEntrySchema`. */
 function requiredDurationSchema() {
-  return z.number({ required_error: 'duration is required.' }).int().positive().max(100_000);
+  return z
+    .number({
+      error: (issue) => (issue.input === undefined ? 'duration is required.' : undefined),
+    })
+    .int()
+    .positive()
+    .max(100_000);
 }
 
 const planEntrySharedFieldsSchema = {
-  leisureItemId: z.string().uuid().nullable().optional(),
+  leisureItemId: z.guid().nullable().optional(),
   title: z.string().trim().min(1, 'title is required.').max(200),
   date: dateSchema,
   recurrence: z.enum(LEISURE_RECURRENCES).optional(),

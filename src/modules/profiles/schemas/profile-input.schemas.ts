@@ -54,7 +54,7 @@ const MIME_TO_EXTENSION: Record<(typeof AVATAR_MIME_TYPES)[number], string> = {
 export const avatarUploadUrlSchema = z
   .object({
     contentType: z.enum(AVATAR_MIME_TYPES, {
-      errorMap: () => ({ message: 'contentType must be image/png, image/jpeg or image/webp.' }),
+      error: 'contentType must be image/png, image/jpeg or image/webp.',
     }),
   })
   .strict();

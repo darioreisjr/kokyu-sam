@@ -13,7 +13,7 @@ const checklistItemSchema = z
 const relatedEntitySchema = z
   .object({
     entityType: z.literal('leisureItem'),
-    entityId: z.string().uuid(),
+    entityId: z.guid(),
   })
   .strict();
 
@@ -37,20 +37,20 @@ export const listNotesQuerySchema = z
   .object({
     pinned: z
       .enum(['true', 'false'])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === 'true')),
+      .transform((value) => value === 'true')
+      .optional(),
     archived: z
       .enum(['true', 'false'])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === 'true')),
+      .transform((value) => value === 'true')
+      .optional(),
     tag: tagSchema.optional(),
-    relatedItemId: z.string().uuid().optional(),
+    relatedItemId: z.guid().optional(),
   })
   .strict();
 
 export const toggleChecklistItemParamsSchema = z
   .object({
-    noteId: z.string().uuid(),
+    noteId: z.guid(),
     checklistItemId: z.string().trim().min(1).max(80),
   })
   .strict();
