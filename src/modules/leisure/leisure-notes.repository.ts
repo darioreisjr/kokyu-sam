@@ -59,7 +59,7 @@ export class SupabaseLeisureNotesRepository implements LeisureNotesRepository {
       title: input.title ?? null,
       content: input.content,
       type: input.type,
-      checklist_items: (input.checklistItems ?? []) as unknown as Json,
+      checklist_items: (input.checklistItems ?? []) as unknown as NonNullable<Json>,
       link_url: input.linkUrl ?? null,
       tags: input.tags ?? [],
       pinned: input.pinned ?? false,
@@ -86,7 +86,7 @@ export class SupabaseLeisureNotesRepository implements LeisureNotesRepository {
     if (patch.content !== undefined) update.content = patch.content;
     if (patch.type !== undefined) update.type = patch.type;
     if (patch.checklistItems !== undefined) {
-      update.checklist_items = (patch.checklistItems ?? []) as unknown as Json;
+      update.checklist_items = (patch.checklistItems ?? []) as unknown as NonNullable<Json>;
     }
     if (patch.linkUrl !== undefined) update.link_url = patch.linkUrl;
     if (patch.tags !== undefined) update.tags = patch.tags;

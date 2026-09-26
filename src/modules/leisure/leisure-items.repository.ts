@@ -83,7 +83,7 @@ export class SupabaseLeisureItemsRepository implements LeisureItemsRepository {
       source: input.source ?? null,
       source_url: input.sourceUrl ?? null,
       recommended_by: input.recommendedBy ?? null,
-      details: input.details as Json,
+      details: input.details as NonNullable<Json>,
     };
 
     const { data, error } = await client.from('leisure_items').insert(insert).select('*').single();
@@ -116,7 +116,7 @@ export class SupabaseLeisureItemsRepository implements LeisureItemsRepository {
     if (patch.sourceUrl !== undefined) update.source_url = patch.sourceUrl;
     if (patch.recommendedBy !== undefined) update.recommended_by = patch.recommendedBy;
     if (patch.type !== undefined) update.type = patch.type;
-    if (patch.details !== undefined) update.details = patch.details as Json;
+    if (patch.details !== undefined) update.details = patch.details as NonNullable<Json>;
 
     const { data, error } = await client
       .from('leisure_items')
