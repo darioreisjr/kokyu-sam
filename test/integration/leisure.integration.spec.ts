@@ -605,7 +605,9 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
   it("summary: reflects an in-progress item, a backlog (unsorted) count, and today's next plan entry", async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
-    const today = new Date().toISOString().slice(0, 10);
+    // Tomorrow, not today: the past-time guard rejects a fixed time today
+    // once the clock has passed it, which made this depend on when CI ran.
+    const planDay = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     await auth(request(server()).post('/api/v1/leisure/items')).send({
       type: 'game',
@@ -620,15 +622,16 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
       durationType: 'unknown',
       unsorted: {},
     });
-    await auth(request(server()).post('/api/v1/leisure/plan')).send({
+    const plan = await auth(request(server()).post('/api/v1/leisure/plan')).send({
       title: 'Plano de hoje',
-      date: today,
+      date: planDay,
       startTime: '18:00',
       endTime: '19:00',
       duration: 60,
     });
+    expect(plan.status).toBe(201);
 
-    const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${today}`));
+    const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${planDay}`));
     expect(summary.status).toBe(200);
     const body = summary.body as SummaryBody;
     expect(body.inProgress?.title).toBe('Jogando agora');
@@ -639,23 +642,25 @@ describe.skipIf(!canRun)('Leisure (Supabase local integration)', () => {
   it("summary: a daily entry still counts as a later day's next plan entry, not just its own anchor date", async () => {
     const { accessToken } = await createConfirmedUser();
     const auth = (req: request.Test) => req.set('Authorization', `Bearer ${accessToken}`);
-    // Anchored today (the past-date guard forbids creating one anchored
-    // earlier - see findPastPlanEntryViolation), checked against
-    // tomorrow's summary instead: the whole point of this fix is that a
-    // daily/weekly entry isn't only "planned" on its own literal `date`.
-    const today = new Date().toISOString().slice(0, 10);
+    // Anchored tomorrow (the past-date/time guard forbids an anchor already
+    // in the past - see findPastPlanEntryViolation - and a fixed time today
+    // becomes past as the day goes on), checked against the day after: the
+    // whole point of this fix is that a daily/weekly entry isn't only
+    // "planned" on its own literal `date`.
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const dayAfter = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    await auth(request(server()).post('/api/v1/leisure/plan')).send({
+    const plan = await auth(request(server()).post('/api/v1/leisure/plan')).send({
       title: 'Alongar',
-      date: today,
+      date: tomorrow,
       recurrence: 'daily',
       startTime: '07:00',
       endTime: '07:30',
       duration: 30,
     });
+    expect(plan.status).toBe(201);
 
-    const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${tomorrow}`));
+    const summary = await auth(request(server()).get(`/api/v1/leisure/summary?date=${dayAfter}`));
     expect(summary.status).toBe(200);
     expect((summary.body as SummaryBody).plannedToday?.title).toBe('Alongar');
   });
