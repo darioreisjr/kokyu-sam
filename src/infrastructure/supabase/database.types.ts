@@ -10,12 +10,7 @@ export type Database = {
     };
     Functions: {
       graphql: {
-        Args: {
-          extensions?: Json;
-          operationName?: string;
-          query?: string;
-          variables?: Json;
-        };
+        Args: { extensions?: Json; operationName?: string; query?: string; variables?: Json };
         Returns: Json;
       };
     };
@@ -97,7 +92,7 @@ export type Database = {
           cover_image: string | null;
           created_at: string;
           description: string | null;
-          details: Json;
+          details: NonNullable<Json>;
           duration_type: string;
           estimated_duration: number | null;
           favorite: boolean;
@@ -119,7 +114,7 @@ export type Database = {
           cover_image?: string | null;
           created_at?: string;
           description?: string | null;
-          details?: Json;
+          details?: NonNullable<Json>;
           duration_type?: string;
           estimated_duration?: number | null;
           favorite?: boolean;
@@ -141,7 +136,7 @@ export type Database = {
           cover_image?: string | null;
           created_at?: string;
           description?: string | null;
-          details?: Json;
+          details?: NonNullable<Json>;
           duration_type?: string;
           estimated_duration?: number | null;
           favorite?: boolean;
@@ -213,7 +208,7 @@ export type Database = {
       leisure_notes: {
         Row: {
           archived: boolean;
-          checklist_items: Json;
+          checklist_items: NonNullable<Json>;
           content: string;
           created_at: string;
           id: string;
@@ -229,7 +224,7 @@ export type Database = {
         };
         Insert: {
           archived?: boolean;
-          checklist_items?: Json;
+          checklist_items?: NonNullable<Json>;
           content?: string;
           created_at?: string;
           id?: string;
@@ -245,7 +240,7 @@ export type Database = {
         };
         Update: {
           archived?: boolean;
-          checklist_items?: Json;
+          checklist_items?: NonNullable<Json>;
           content?: string;
           created_at?: string;
           id?: string;
@@ -525,9 +520,7 @@ export type Tables<
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R;
@@ -550,9 +543,7 @@ export type TablesInsert<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I;
     }
@@ -574,9 +565,7 @@ export type TablesUpdate<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U;
     }
@@ -598,9 +587,7 @@ export type Enums<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
     ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
@@ -614,9 +601,7 @@ export type CompositeTypes<
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never) = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
     ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
