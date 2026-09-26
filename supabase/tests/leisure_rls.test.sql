@@ -8,6 +8,8 @@
 --   * User A can read/write only their own rows.
 --   * User A cannot read or mutate User B's rows (RLS matches 0 rows).
 --   * anon has no privileges at all.
+--   * authenticated can never hard-delete a leisure_plan_entries row, not
+--     even its own (archive-only, see the 20260912 migration).
 -- Plus:
 --   * leisure_plan_entries.leisure_item_id survives the owning item's
 --     deletion (ON DELETE SET NULL), instead of cascading.
@@ -18,7 +20,7 @@
 --     parent tables even though it's a plain junction table.
 
 begin;
-select plan(24);
+select plan(25);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -198,7 +200,22 @@ select is(
   'Deleting the item cascade-deleted its leisure_collection_items row (ON DELETE CASCADE)'
 );
 
+-- --- Plan entries are never hard-deleted by users (archive-only) ----------
+-- 20260912000000_leisure_plan_entries_archive.sql dropped the delete policy
+-- and revoked DELETE from authenticated: archiving is the only removal.
+select throws_ok(
+  $$ delete from public.leisure_plan_entries where id = 'aaaaaaaa-0000-0000-0000-000000000002' $$,
+  '42501',
+  null,
+  'User A cannot hard-delete their own leisure_plan_entries row (archive-only)'
+);
+
+reset role;
+reset request.jwt.claims;
+
 -- --- ON DELETE CASCADE: deleting a plan entry takes its completions too ---
+-- Only a privileged role can still delete a plan entry (e.g. account
+-- deletion cascading from auth.users), so the FK is exercised as postgres.
 delete from public.leisure_plan_entries where id = 'aaaaaaaa-0000-0000-0000-000000000002';
 
 select is(
@@ -206,9 +223,6 @@ select is(
   0,
   'Deleting the plan entry cascade-deleted its leisure_plan_entry_completions row (ON DELETE CASCADE)'
 );
-
-reset role;
-reset request.jwt.claims;
 
 -- --- Simulate anon -----------------------------------------------------------
 set local role anon;
