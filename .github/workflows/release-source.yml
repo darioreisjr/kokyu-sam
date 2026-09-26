@@ -1,0 +1,26 @@
+name: Release source
+
+# main is production and only receives releases from develop. Required
+# status check on main's ruleset; every other branch targets develop.
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  source:
+    name: main only accepts PRs from develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR comes from this repository's develop branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ] || [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "::error::main only accepts pull requests from ${REPO}:develop (got ${HEAD_REPO}:${HEAD_REF}). Open the PR against develop instead."
+            exit 1
+          fi
+          echo "OK: ${HEAD_REPO}:${HEAD_REF}"

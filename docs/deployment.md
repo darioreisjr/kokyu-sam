@@ -2,11 +2,19 @@
 
 ## Ambientes
 
-| Ambiente | Frontend | Nest | Supabase |
-| --- | --- | --- | --- |
-| Development | `localhost:3001` | `localhost:3000` | Supabase local (`supabase start`) |
-| Preview (Vercel) | preview deployment | preview Function | projeto Supabase de **staging** (nunca produção) |
-| Production | domínio de produção | Vercel Function de produção | projeto Supabase de produção |
+| Ambiente                             | Frontend                                           | Nest                                                   | Supabase                          |
+| ------------------------------------ | -------------------------------------------------- | ------------------------------------------------------ | --------------------------------- |
+| Local                                | `localhost:3001`                                   | `localhost:3000`                                       | Supabase local (`supabase start`) |
+| `develop` (Vercel Preview, URL fixa) | `kokyu-git-develop-projetosdarioreisjr.vercel.app` | `kokyu-sam-git-develop-projetosdarioreisjr.vercel.app` | `kokyu-staging`                   |
+| Outras branches (Vercel Preview)     | preview deployment                                 | preview Function                                       | `kokyu-staging` (nunca produção)  |
+| `main` (Production)                  | domínio de produção                                | Vercel Function de produção                            | `kokyu-production`                |
+
+## Branches
+
+- `develop` é a branch padrão e a base de toda branch nova (`feat/...`, `fix/...`, `chore/...`); só recebe PR, com o CI verde.
+- `main` é produção e só recebe PR **vindo da `develop`** (release), com o CI verde, via merge commit. O check `Release source` recusa qualquer outra origem.
+- O Dependabot abre os PRs contra a `develop`.
+- A `develop` usa variáveis de ambiente próprias na Vercel (Preview, branch `develop`): `APP_URL`, `FRONTEND_URL` e `CORS_ORIGINS` apontam para as URLs fixas da `develop`.
 
 Preview deployments nunca devem apontar para o Supabase de produção — configure `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` de preview separadamente no painel da Vercel.
 
