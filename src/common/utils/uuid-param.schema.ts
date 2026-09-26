@@ -6,4 +6,4 @@ import { z } from 'zod';
  * obviously-malformed id (never a valid row anyway) fails fast with a 400
  * instead of reaching the repository/Supabase.
  */
-export const UuidParam = z.object({ id: z.string().uuid() }).strict();
+export const UuidParam = z.object({ id: z.guid() }).strict();

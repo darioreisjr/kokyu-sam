@@ -87,6 +87,12 @@ describe('createLeisureItemSchema', () => {
 });
 
 describe('updateLeisureItemSchema', () => {
+  it('leaves tags out of a patch that did not send them (never clears them)', () => {
+    const result = updateLeisureItemSchema.safeParse({ title: 'Novo título' });
+    expect(result.success).toBe(true);
+    expect(result.success && 'tags' in result.data).toBe(false);
+  });
+
   it('allows a partial patch with no type at all', () => {
     const result = updateLeisureItemSchema.safeParse({ title: 'Renamed' });
 

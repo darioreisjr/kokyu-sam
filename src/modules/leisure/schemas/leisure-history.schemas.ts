@@ -3,7 +3,7 @@ import { LEISURE_ITEM_TYPES } from '../constants/leisure-enums.constant';
 
 export const createLogEntrySchema = z
   .object({
-    leisureItemId: z.string().uuid().nullable().optional(),
+    leisureItemId: z.guid().nullable().optional(),
     activityType: z.enum(LEISURE_ITEM_TYPES),
     title: z.string().trim().min(1, 'title is required.').max(200),
     startedAt: z.string().trim().datetime({ offset: true }).nullable().optional(),
@@ -16,7 +16,7 @@ export const createLogEntrySchema = z
 
 export const listHistoryQuerySchema = z
   .object({
-    leisureItemId: z.string().uuid().optional(),
+    leisureItemId: z.guid().optional(),
     limit: z.coerce.number().int().positive().max(500).optional(),
   })
   .strict();
