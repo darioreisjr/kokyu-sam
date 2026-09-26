@@ -9,6 +9,13 @@ updates:
       nestjs:
         patterns:
           - '@nestjs/*'
+    ignore:
+      # NestJS 12 (and @nestjs/config 12, @nestjs/swagger 12) are ESM-only.
+      # This app is CommonJS; Node 22 can require() them, but the Vercel
+      # function runtime can't (ERR_REQUIRE_ESM, see #19). Revisit after
+      # migrating the backend to ESM.
+      - dependency-name: '@nestjs/*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: 'docker'
     directory: '/'
