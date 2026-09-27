@@ -192,12 +192,46 @@ describe('Kokyu API (e2e)', () => {
     expect(serialized).not.toContain('password');
   });
 
-  it('rejects a disallowed CORS origin', async () => {
+  it('rejects a disallowed CORS origin with a 403 Problem Details, not a 500', async () => {
     const response = await request(server())
       .get('/api/health')
       .set('Origin', 'https://evil.example.com');
 
+    expect(response.status).toBe(403);
     expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    expect(response.body).toMatchObject({
+      status: 403,
+      code: 'CORS_ORIGIN_FORBIDDEN',
+      title: 'Origin not allowed',
+      instance: '/api/health',
+    });
+  });
+
+  it('rejects a disallowed CORS preflight with a 403', async () => {
+    const response = await request(server())
+      .options('/api/v1/me')
+      .set('Origin', 'https://evil.example.com')
+      .set('Access-Control-Request-Method', 'GET');
+
+    expect(response.status).toBe(403);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('answers an allowlisted CORS preflight', async () => {
+    const response = await request(server())
+      .options('/api/v1/me')
+      .set('Origin', 'http://localhost:3001')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3001');
+  });
+
+  it('never blocks a request without an Origin header (server-to-server, health checks)', async () => {
+    const response = await request(server()).get('/api/health');
+
+    expect(response.status).toBe(200);
   });
 
   it('allows an allowlisted CORS origin', async () => {

@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { Logger } from 'nestjs-pino';
 import { AppConfig } from './config/app.config';
+import { rejectDisallowedOrigin } from './common/cors/reject-disallowed-origin.middleware';
 import { isOriginAllowed } from './common/utils/cors-origin.util';
 
 const JSON_BODY_LIMIT = '100kb';
@@ -30,16 +31,15 @@ export function configureApp(app: INestApplication): void {
 
   app.use(helmet());
 
+  // A disallowed origin gets a 403 Problem Details here, before `cors`
+  // (see rejectDisallowedOrigin); the callback below only ever allows.
+  app.use(rejectDisallowedOrigin(appConfig.corsOrigins));
   app.enableCors({
     origin: (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void,
     ) => {
-      if (!origin || isOriginAllowed(origin, appConfig.corsOrigins)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error('Not allowed by CORS'));
+      callback(null, !origin || isOriginAllowed(origin, appConfig.corsOrigins));
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
