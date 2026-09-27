@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from '../../../common/utils/http-url.schema';
 import {
   LEISURE_DURATION_TYPES,
   LEISURE_ITEM_STATUSES,
@@ -12,14 +13,14 @@ import { tagSchema, tagsSchema as normalizedTagsSchema } from './leisure-tags.sc
 
 const titleSchema = z.string().trim().min(1, 'title is required.').max(200);
 const descriptionSchema = z.string().trim().max(2000).nullable().optional();
-const coverImageSchema = z.string().trim().url().max(2048).nullable().optional();
+const coverImageSchema = httpUrlSchema.nullable().optional();
 // No `.default([])` here: this schema is shared with the PATCH schema, and
 // zod 4 applies a default even inside `.optional()` - a PATCH without
 // `tags` would then clear them. The create path defaults to [] itself
 // (see toCreateInput).
 const tagsSchema = normalizedTagsSchema;
 const sourceSchema = z.string().trim().max(200).nullable().optional();
-const sourceUrlSchema = z.string().trim().url().max(2048).nullable().optional();
+const sourceUrlSchema = httpUrlSchema.nullable().optional();
 const recommendedBySchema = z.string().trim().max(120).nullable().optional();
 const durationMinutesSchema = z.number().int().positive().max(100_000).nullable().optional();
 

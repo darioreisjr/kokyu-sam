@@ -1,4 +1,5 @@
 import { z, ZodTypeAny } from 'zod';
+import { httpUrlSchema } from '../../../common/utils/http-url.schema';
 import { LEISURE_ITEM_TYPES, LeisureItemType } from '../constants/leisure-enums.constant';
 
 /**
@@ -96,7 +97,7 @@ const eventDetailsSchema = z
       .object({
         purchased: z.boolean().optional(),
         price: z.number().nonnegative().optional(),
-        ticketUrl: z.string().trim().url().max(2048).optional(),
+        ticketUrl: httpUrlSchema.optional(),
       })
       .strict()
       .optional(),
