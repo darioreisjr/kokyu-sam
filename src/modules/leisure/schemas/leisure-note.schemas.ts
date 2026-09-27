@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from '../../../common/utils/http-url.schema';
 import { LEISURE_NOTE_TYPES } from '../constants/leisure-enums.constant';
 import { tagSchema, tagsSchema } from './leisure-tags.schema';
 
@@ -22,7 +23,7 @@ const noteFieldsSchema = z.object({
   content: z.string().trim().max(5000),
   type: z.enum(LEISURE_NOTE_TYPES),
   checklistItems: z.array(checklistItemSchema).max(100).nullable().optional(),
-  linkUrl: z.string().trim().url().max(2048).nullable().optional(),
+  linkUrl: httpUrlSchema.nullable().optional(),
   tags: tagsSchema.optional(),
   pinned: z.boolean().optional(),
   archived: z.boolean().optional(),
