@@ -60,6 +60,18 @@ describe('supabaseConfig', () => {
 });
 
 describe('authConfig', () => {
+  it('keeps the default throttle at 100/min unless THROTTLE_DEFAULT_LIMIT is set', () => {
+    const previous = process.env.THROTTLE_DEFAULT_LIMIT;
+    delete process.env.THROTTLE_DEFAULT_LIMIT;
+    expect(authConfig().throttle.default.limit).toBe(100);
+
+    process.env.THROTTLE_DEFAULT_LIMIT = '1000';
+    expect(authConfig().throttle.default.limit).toBe(1000);
+
+    if (previous === undefined) delete process.env.THROTTLE_DEFAULT_LIMIT;
+    else process.env.THROTTLE_DEFAULT_LIMIT = previous;
+  });
+
   it('provides Nest-side throttle defaults that complement (never replace) Supabase rate limits', () => {
     const config = authConfig();
 
