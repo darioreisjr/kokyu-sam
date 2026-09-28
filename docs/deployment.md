@@ -60,18 +60,28 @@ GitHub → Vercel → NestJS Functions (Node runtime) → Supabase
 - Escolher a região da Function o mais próxima possível da região do projeto Supabase, para reduzir latência (configurar em Project Settings → Functions → Region).
 - A aplicação é stateless: sem filesystem persistente (exceto `/tmp` efêmero, não usado nesta fase), sem sessão em memória, sem cron/fila/worker residente.
 
-## Migrations em produção
+## Migrations
 
-Migrations **nunca** rodam no bootstrap da API (nada de `supabase db push`/`migration up` disparado por um cold start). Elas são uma etapa explícita de CI/CD:
+Migrations **nunca** rodam no bootstrap da API (nada de `supabase db push`/`migration up` disparado por um cold start) e **nunca** são aplicadas à mão pelo SQL Editor — isso deixa o banco fora do histórico de migrations. Quem aplica é o workflow [`.github/workflows/migrations.yml`](../.github/workflows/migrations.yml):
 
-```bash
-supabase link --project-ref <prod-project-ref>
-supabase db push   # ou: supabase migration up --linked
-```
+| Evento                                                        | O que acontece                                                                                                          |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| PR para `develop`/`main` que mexe em `supabase/migrations/**` | **Dry-run** contra o banco de destino (staging ou produção): o log do job mostra o que seria aplicado. Nada é alterado. |
+| Push na `develop` com migration nova                          | Aplica no **staging** (`kokyu-staging`).                                                                                |
+| Push na `main` com migration nova                             | Aguarda **aprovação** no ambiente `production` do GitHub e só então aplica em **produção** (`kokyu-production`).        |
+| _Run workflow_ manual                                         | Aplica as pendências no ambiente escolhido (produção só a partir da `main`, também com aprovação).                      |
 
-Migrations destrutivas (`DROP COLUMN`, `DROP TABLE`, mudanças de tipo com perda de dados) exigem revisão explícita antes do merge — nunca aplicadas automaticamente sem revisão humana.
+Configuração no GitHub (uma vez):
 
-`seed.sql` roda apenas em desenvolvimento local; produção nunca executa seed automaticamente.
+- Secret do repositório `SUPABASE_ACCESS_TOKEN`: token pessoal do Supabase (Account → Access Tokens) da conta dona dos dois projetos.
+- Variáveis do repositório `SUPABASE_STAGING_PROJECT_REF` e `SUPABASE_PRODUCTION_PROJECT_REF`.
+- Ambientes `staging` e `production`; `production` com revisor obrigatório e restrito à branch `main`.
+
+A Vercel publica o código assim que a `main` recebe a release, enquanto a migration de produção espera a aprovação — aprove logo após o merge. Mantenha as migrations **aditivas** (colunas/tabelas novas, nada que o código atual deixe de encontrar), para que a ordem entre deploy e migration não quebre nada.
+
+Migrations destrutivas (`DROP COLUMN`, `DROP TABLE`, mudanças de tipo com perda de dados) exigem revisão explícita antes do merge — a aprovação do ambiente `production` é o último ponto de parada.
+
+`seed.sql` roda apenas em desenvolvimento local; staging e produção nunca executam seed.
 
 ## Rollback
 

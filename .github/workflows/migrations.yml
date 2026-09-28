@@ -1,0 +1,101 @@
+name: Supabase migrations
+
+# Applies supabase/migrations to the hosted databases, so a migration is
+# never run by hand again (and never left out of the migration history):
+#   - pull request touching migrations -> dry-run against the target
+#     database, printed in the job log (nothing is applied)
+#   - push to develop -> apply to staging
+#   - push to main    -> apply to production, after an approval on the
+#                        GitHub "production" environment
+#   - manual run      -> apply pending migrations to the chosen environment
+#
+# Needs: repository secret SUPABASE_ACCESS_TOKEN (a Supabase personal
+# access token of the account that owns both projects) and repository
+# variables SUPABASE_STAGING_PROJECT_REF / SUPABASE_PRODUCTION_PROJECT_REF.
+# See docs/deployment.md#migrations.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths: ['supabase/migrations/**']
+  push:
+    branches: [develop, main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to apply pending migrations
+        type: choice
+        options: [staging, production]
+        required: true
+
+permissions:
+  contents: read
+
+# Never two runs against the same database at once; a newer push waits
+# instead of cancelling a push that may be mid-migration.
+concurrency:
+  group: supabase-migrations-${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  dry-run:
+    name: Dry-run against ${{ github.base_ref == 'main' && 'production' || 'staging' }}
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+
+      - name: Link the target project
+        env:
+          PROJECT_REF: ${{ github.base_ref == 'main' && vars.SUPABASE_PRODUCTION_PROJECT_REF || vars.SUPABASE_STAGING_PROJECT_REF }}
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Migration history (local vs remote)
+        run: supabase migration list --linked
+
+      - name: What this PR would apply
+        run: supabase db push --linked --dry-run
+
+  apply:
+    name: Apply to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # The "production" environment requires an approval before this job starts.
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+    steps:
+      - name: Refuse production from anything but main
+        if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && github.ref_name != 'main'
+        run: |
+          echo "::error::Production migrations run from main only (this run is on ${GITHUB_REF_NAME})."
+          exit 1
+
+      - uses: actions/checkout@v7
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+
+      - name: Link the target project
+        env:
+          PROJECT_REF: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'production' || 'staging')) == 'production' && vars.SUPABASE_PRODUCTION_PROJECT_REF || vars.SUPABASE_STAGING_PROJECT_REF }}
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Migration history before
+        run: supabase migration list --linked
+
+      - name: Pending migrations
+        run: supabase db push --linked --dry-run
+
+      - name: Apply
+        run: supabase db push --linked --yes
+
+      - name: Migration history after
+        run: supabase migration list --linked
