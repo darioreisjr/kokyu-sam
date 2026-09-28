@@ -24,6 +24,9 @@ export const envSchema = z.object({
   CORS_ORIGINS: z.string().min(1),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
+  /** Requests per minute per client IP (global Nest throttle). Raise only where every client shares one IP, e.g. the e2e suite in CI. */
+  THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().default(100),
+
   SUPABASE_URL: z.string().url(),
   SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   SUPABASE_SECRET_KEY: z.string().min(1).optional(),

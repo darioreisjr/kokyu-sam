@@ -8,7 +8,8 @@ import { registerAs } from '@nestjs/config';
  */
 export const authConfig = registerAs('auth', () => ({
   throttle: {
-    default: { ttlMs: 60_000, limit: 100 },
+    // 100/min per IP unless THROTTLE_DEFAULT_LIMIT says otherwise (validated in env.schema.ts).
+    default: { ttlMs: 60_000, limit: Number(process.env.THROTTLE_DEFAULT_LIMIT ?? 100) },
     sensitive: { ttlMs: 60_000, limit: 10 },
   },
 }));
